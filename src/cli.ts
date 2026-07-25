@@ -38,6 +38,7 @@ interface RawOpts {
   compact?: boolean;
   export?: ExportFormat;
   output?: string;
+  year?: boolean;
 }
 
 function toFlags(opts: RawOpts): CommandFlags {
@@ -190,10 +191,18 @@ export function buildProgram(): Command {
     });
   program.addCommand(watch, { hidden: true });
 
-  // Running ccprism with no command shows the dashboard.
-  withGlobalFlags(program).action(async (opts: RawOpts) => {
-    process.exitCode = await runDashboard(toFlags(opts));
-  });
+  // Running ccprism with no command shows the dashboard. --year adds
+  // the activity heatmap of daily cost; it lives on the root program
+  // because the bare dashboard is not a subcommand of its own.
+  withGlobalFlags(program)
+    .option("--year", "activity heatmap of daily cost over the past year")
+    .action(async (opts: RawOpts) => {
+      process.exitCode = await runDashboard({
+        ...toFlags(opts),
+        year: opts.year === true,
+        ascii: opts.ascii === true,
+      });
+    });
 
   // The two features that are not commands, so the grouped list above
   // cannot mention them: the bare dashboard and view's live mode.

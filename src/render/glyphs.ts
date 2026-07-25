@@ -22,6 +22,10 @@ export interface GlyphSet {
   // Filled and empty cells of the context gauge.
   gaugeFull: string;
   gaugeEmpty: string;
+  // Five rising intensities for the activity heatmap, index 0 the
+  // quietest. The glyph carries the level on its own so the heatmap
+  // reads with color stripped; green shading only reinforces it.
+  heatRamp: [string, string, string, string, string];
   tools: Record<ToolCategory, string>;
 }
 
@@ -36,6 +40,7 @@ export const UNICODE_GLYPHS: GlyphSet = {
   minus: "−",
   gaugeFull: "▓",
   gaugeEmpty: "░",
+  heatRamp: ["·", "░", "▒", "▓", "█"],
   tools: {
     bash: "⚡",
     edit: "✎",
@@ -59,6 +64,7 @@ export const ASCII_GLYPHS: GlyphSet = {
   minus: "-",
   gaugeFull: "#",
   gaugeEmpty: "-",
+  heatRamp: [".", ":", "+", "*", "#"],
   tools: {
     bash: "$",
     edit: "+",

@@ -76,8 +76,16 @@ commands on the side. One binary, four integration surfaces.
 - `view` gains `--export md` and `--export html`, writing to `./<shortid>.md`
   unless `-o` says otherwise. Export implies `--full`. The html is one file,
   no scripts and no external assets.
-- The dashboard gains a per day row for the last 14 days with a small bar, and
-  a `--month` flag that widens today and this week to this month.
+- The dashboard gains an activity heatmap on `--year` (shipped 2026-07-25): a
+  GitHub-style contribution graph of **daily cost**, weeks as columns and days
+  as rows, capped at a rolling year and shrinking from the left on narrow
+  terminals. Intensity rides the glyph ramp (`·░▒▓█`, ascii `.:+*#`) so it
+  reads with color stripped; green shading only reinforces. A stat strip
+  underneath gives the peak day, longest streak, and current streak, with a
+  `less …█ more` legend. `--json` carries `activity` and a `byDay` series.
+  This supersedes the earlier "14-day rows with a small bar" idea — the year
+  heatmap is its superset. Still open: a `--month` flag that widens today and
+  this week to month totals (orthogonal, not built).
 - `statusline` reads `COLUMNS` and drops the rightmost fields per row at
   narrow widths instead of wrapping.
 - `doctor` is unchanged.

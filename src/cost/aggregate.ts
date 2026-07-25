@@ -155,15 +155,88 @@ export function rollupByKey(
   return groups;
 }
 
+// YYYY-MM-DD in local time, the key both the day aggregator and the
+// heatmap group by.
+export function localDayKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 // Local calendar day, so day boundaries follow the user's clock and
 // not UTC.
 export function dayOf(timestamp: string | undefined): string | undefined {
   if (timestamp === undefined) return undefined;
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return undefined;
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
+  return localDayKey(date);
+}
+
+export interface ActivityStats {
+  // Highest-cost day in the range and its dollars, undefined when
+  // nothing was spent.
+  mostActiveDay: string | undefined;
+  mostActiveUsd: number;
+  // Longest run of consecutive spending days anywhere in the range.
+  longestStreak: number;
+  // Consecutive spending days ending on the last day, so an idle
+  // today reads 0 the way a contribution graph does.
+  currentStreak: number;
+  activeDays: number;
+}
+
+// Streaks and the peak day over an inclusive range of local days,
+// reading cost from `daily` (keyed by localDayKey). Walks the calendar
+// day by day rather than the map keys, so a gap with no log line still
+// breaks a streak. A day counts as active when it cost money; days
+// whose only usage was unpriced contribute no shade and no streak,
+// which matches a cost heatmap.
+export function activityStats(
+  daily: Map<string, number>,
+  from: Date,
+  to: Date,
+): ActivityStats {
+  let mostActiveDay: string | undefined;
+  let mostActiveUsd = 0;
+  let activeDays = 0;
+  let longestStreak = 0;
+  let run = 0;
+
+  const cursor = new Date(from);
+  cursor.setHours(0, 0, 0, 0);
+  const end = new Date(to);
+  end.setHours(0, 0, 0, 0);
+  while (cursor.getTime() <= end.getTime()) {
+    const usd = daily.get(localDayKey(cursor)) ?? 0;
+    if (usd > 0) {
+      activeDays += 1;
+      run += 1;
+      if (run > longestStreak) longestStreak = run;
+      if (usd > mostActiveUsd) {
+        mostActiveUsd = usd;
+        mostActiveDay = localDayKey(cursor);
+      }
+    } else {
+      run = 0;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  let currentStreak = 0;
+  const back = new Date(to);
+  back.setHours(0, 0, 0, 0);
+  const start = new Date(from);
+  start.setHours(0, 0, 0, 0);
+  while (back.getTime() >= start.getTime()) {
+    if ((daily.get(localDayKey(back)) ?? 0) > 0) {
+      currentStreak += 1;
+      back.setDate(back.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return { mostActiveDay, mostActiveUsd, longestStreak, currentStreak, activeDays };
 }
 
 export interface SessionSummary {

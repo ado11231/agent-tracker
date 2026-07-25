@@ -427,6 +427,12 @@ Global (every command):
 
 `sessions` only: `--limit <n>` (default 20, 0 shows all).
 
+Dashboard (bare `ccprism`) only: `--year` renders an activity heatmap of
+daily cost above the spend rows — a contribution graph capped at a rolling
+year, week columns and weekday rows, intensity on the glyph ramp so it
+survives `NO_COLOR`, with a most-active/longest/current-streak strip and a
+legend beneath. `--json` adds an `activity` object and a `byDay` series.
+
 ### UX rules
 
 - `-h` output fits one screen. No pager, no walls.

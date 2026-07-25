@@ -177,6 +177,35 @@ describe("dashboard", () => {
     expect(text).toContain("model");
     expect(text).not.toContain("[");
   });
+
+  it("adds the activity heatmap only when --year is given", async () => {
+    const root = await makeRoot();
+    // Default run carries no heatmap keys.
+    let code = await runDashboard(flags(root));
+    expect(code).toBe(0);
+    expect(JSON.parse(logged()).activity).toBeUndefined();
+
+    logSpy.mockClear();
+    code = await runDashboard({ ...flags(root), year: true });
+    expect(code).toBe(0);
+    const out = JSON.parse(logged());
+    expect(out.activity.activeDays).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(out.byDay)).toBe(true);
+    expect(out.byDay.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("prints the heatmap block in text with --year", async () => {
+    const code = await runDashboard({
+      ...flags(await makeRoot()),
+      json: false,
+      year: true,
+    });
+    expect(code).toBe(0);
+    const text = logged();
+    expect(text).toContain("daily cost");
+    expect(text).toContain("Mon");
+    expect(text).toContain("less ");
+  });
 });
 
 describe("sessions", () => {

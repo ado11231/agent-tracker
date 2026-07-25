@@ -1,10 +1,12 @@
 import {
+  activityStats,
   cacheHitRatio,
   dayOf,
   emptyRollup,
   mergeRollups,
   rollupByKey,
   rollupOf,
+  type ActivityStats,
   type UsageRollup,
 } from "../cost/aggregate.js";
 import { SYNTHETIC_MODEL } from "../cost/cost.js";
@@ -20,6 +22,8 @@ import {
   renderTable,
   shortModel,
 } from "../render/format.js";
+import { glyphsFor } from "../render/glyphs.js";
+import { heatmapRange, renderHeatmap } from "../render/heatmap.js";
 import { colorEnabled, makeStyle } from "../render/style.js";
 import {
   inWindow,
@@ -30,10 +34,24 @@ import {
   type TimeWindow,
 } from "./load.js";
 
+// --year adds the activity heatmap; --ascii swaps its glyph ramp.
+export type DashboardFlags = CommandFlags & {
+  year?: boolean;
+  ascii?: boolean;
+};
+
 interface ProjectRow {
   name: string;
   sessions: number;
   rollup: UsageRollup;
+}
+
+interface Heatmap {
+  from: Date;
+  to: Date;
+  weeks: number;
+  daily: Map<string, number>;
+  stats: ActivityStats;
 }
 
 function startOfLocalDay(date: Date): Date {
@@ -42,7 +60,7 @@ function startOfLocalDay(date: Date): Date {
   return start;
 }
 
-export async function runDashboard(flags: CommandFlags): Promise<number> {
+export async function runDashboard(flags: DashboardFlags): Promise<number> {
   let window: TimeWindow;
   try {
     window = parseWindow(flags);
@@ -114,6 +132,17 @@ export async function runDashboard(flags: CommandFlags): Promise<number> {
     ? windowed.filter((w) => w.usage.length > 0).length
     : sessions.length;
 
+  let heatmap: Heatmap | undefined;
+  if (flags.year === true) {
+    const daily = new Map<string, number>();
+    for (const [key, rollup] of rollupByKey(allUsage, (u) => dayOf(u.timestamp))) {
+      daily.set(key, rollup.usd);
+    }
+    const width = process.stdout.columns ?? 80;
+    const { from, weeks } = heatmapRange(now, width);
+    heatmap = { from, to: now, weeks, daily, stats: activityStats(daily, from, now) };
+  }
+
   if (flags.json) {
     console.log(
       JSON.stringify(
@@ -138,6 +167,17 @@ export async function runDashboard(flags: CommandFlags): Promise<number> {
           })),
           byModel: models.map(([model, rollup]) => ({ model, ...rollup })),
           byTool: toolRows.map(([category, stats]) => ({ category, ...stats })),
+          ...(heatmap
+            ? {
+                activity: {
+                  since: heatmap.from.toISOString(),
+                  ...heatmap.stats,
+                },
+                byDay: [...heatmap.daily.entries()]
+                  .sort((a, b) => a[0].localeCompare(b[0]))
+                  .map(([date, usd]) => ({ date, usd })),
+              }
+            : {}),
         },
         null,
         2,
@@ -158,6 +198,7 @@ export async function runDashboard(flags: CommandFlags): Promise<number> {
       models,
       toolRows,
       windowGiven,
+      heatmap,
     },
     flags,
   );
@@ -175,10 +216,11 @@ interface DashboardData {
   models: [string, UsageRollup][];
   toolRows: [string, { calls: number; failures: number; usd: number }][];
   windowGiven: boolean;
+  heatmap: Heatmap | undefined;
 }
 
-function printDashboard(data: DashboardData, flags: CommandFlags): void {
-  const { sessionCount, total, today, week, subagents, retries, projects, models, toolRows, windowGiven } = data;
+function printDashboard(data: DashboardData, flags: DashboardFlags): void {
+  const { sessionCount, total, today, week, subagents, retries, projects, models, toolRows, windowGiven, heatmap } = data;
   const c = makeStyle(colorEnabled(flags.color));
   const lines: string[] = [];
   const dot = c.dim("·");
@@ -188,6 +230,20 @@ function printDashboard(data: DashboardData, flags: CommandFlags): void {
       `${c.bold(fmtUsd(total.usd))} ${dot} cache hit ${fmtPercent(cacheHitRatio(total))}`,
   );
   lines.push("");
+
+  if (heatmap !== undefined) {
+    const rendered = renderHeatmap({
+      daily: heatmap.daily,
+      stats: heatmap.stats,
+      from: heatmap.from,
+      to: heatmap.to,
+      weeks: heatmap.weeks,
+      glyphs: glyphsFor(flags.ascii === true),
+      style: c,
+    });
+    for (const line of rendered) lines.push(line);
+    lines.push("");
+  }
 
   const spendRow = (label: string, rollup: UsageRollup): string[] => [
     label,
