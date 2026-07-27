@@ -300,6 +300,25 @@ so one is inferred: context above 200k proves the extended tier, and assuming
 the small window there would report a false red 100%. The gauge row drops
 entirely before the first API call.
 
+**Narrow terminals shorten a row rather than wrapping it.** A wrapped row
+costs a whole extra line of the user's screen and reads as broken, so a row
+that does not fit drops its fields one at a time from the right. The fields
+are already ordered most to least important left to right, which is the whole
+priority model — nothing is re-ranked. The leading field never drops, so the
+row is either absent or still answers the question it exists for: the identity
+row keeps the session name, the cost row keeps the cost, and a gauge row keeps
+its bar and percentage. The `5h` label rides with the quota gauge instead of
+being a droppable field of its own, so that row always says which limit it is
+drawing.
+
+The width comes from `COLUMNS`, falling back to `process.stdout.columns`.
+Claude Code captures our stdout to draw the panel inside its own frame, so
+`stdout.columns` is undefined exactly when it matters and the environment
+variable is the only width the host can hand us. An unknown width shortens
+nothing: guessing narrow would hide fields on a wide terminal, which is the
+worse mistake. Widths are measured on the styled strings, since `string-width`
+ignores ansi escapes.
+
 Color rules (this surface inverts two defaults on purpose):
 
 - Color is **on by default**. Statusline stdout is *always* captured, so the

@@ -8,6 +8,7 @@ import {
   type TurnDelta,
 } from "../src/cost/aggregate.js";
 import {
+  panelWidth,
   runStatusline,
   type StatuslineFlags,
 } from "../src/commands/statusline.js";
@@ -169,6 +170,7 @@ describe("statuslinePanel", () => {
     extra: Partial<SessionSummary> = {},
     ascii = false,
     host: Partial<HostFacts> = {},
+    width?: number,
   ): string[] {
     return statuslinePanel(
       summary({ total: { ...emptyRollup(), usd: 0.19 }, turns: 2, ...extra }),
@@ -178,6 +180,7 @@ describe("statuslinePanel", () => {
         g: glyphsFor(ascii),
         contextWindow,
         host: { ...emptyHostFacts(), ...host },
+        width,
       },
     );
   }
@@ -338,6 +341,92 @@ describe("statuslinePanel", () => {
     expect(row).toContain("5h");
     expect(row).toContain("90% cache");
   });
+
+  // The four rows at their full width, which the cases below narrow:
+  //   sec-review  ·  opus-4-8  ·  high  ·  fast  ·  2 turns   53
+  //   $0.19  ·  $0.19/hr  ·  +156 −23                         31
+  //   ▓▓░░░░░░░░░░░░   14%   27.4k / 200k ctx                 39
+  //   ▓▓▓░░░░░░░░░░░   24%   5h · 41% week · 90% cache        48
+  function wide(width?: number): string[] {
+    return panel(
+      27_400,
+      200_000,
+      {
+        durationMs: 3_600_000,
+        total: {
+          ...emptyRollup(),
+          messages: 4,
+          usd: 0.19,
+          tokens: {
+            input: 1000,
+            output: 0,
+            cacheRead: 9000,
+            cacheWrite5m: 0,
+            cacheWrite1h: 0,
+          },
+        },
+      },
+      false,
+      {
+        sessionName: "sec-review",
+        effort: "high",
+        fastMode: true,
+        linesAdded: 156,
+        linesRemoved: 23,
+        fiveHour: { usedPercentage: 24 },
+        sevenDay: { usedPercentage: 41.2 },
+      },
+      width,
+    );
+  }
+
+  it("drops fields from the right of a row too wide for the terminal", () => {
+    const rows = wide(45);
+    expect(rows[0]).toBe("sec-review  ·  opus-4-8  ·  high  ·  fast");
+    for (const row of rows) expect(row.length).toBeLessThanOrEqual(45);
+  });
+
+  it("shortens only the rows that do not fit", () => {
+    const rows = wide(45);
+    expect(rows[1]).toBe(wide()[1]);
+    expect(rows[2]).toBe(wide()[2]);
+  });
+
+  it("keeps the leading field of a row when nothing else fits", () => {
+    const rows = wide(12);
+    expect(rows[0]).toBe("sec-review");
+    expect(rows[1]).toBe("$0.19");
+  });
+
+  it("keeps a gauge and its percent when the detail beside it will not", () => {
+    const rows = wide(30);
+    expect(rows[2]).toBe("▓▓░░░░░░░░░░░░   14%");
+    // The window label rides with the gauge, so the row still says
+    // which limit it is drawing.
+    expect(rows[3]).toBe("▓▓▓░░░░░░░░░░░   24%   5h");
+  });
+
+  it("shortens nothing when the width is unknown", () => {
+    expect(wide(undefined)[0]).toBe(
+      "sec-review  ·  opus-4-8  ·  high  ·  fast  ·  2 turns",
+    );
+  });
+
+  it("measures the visible width, not the ansi escapes", () => {
+    // Styled, this row is far past 39 bytes and still 39 columns.
+    const row = statuslinePanel(
+      summary({ total: { ...emptyRollup(), usd: 0.19 }, turns: 2 }),
+      { tokens: 27_400, model: "claude-opus-4-8" },
+      {
+        c: makeStyle(true),
+        g: glyphsFor(false),
+        contextWindow: 200_000,
+        width: 39,
+      },
+    )[2] as string;
+    expect(row.length).toBeGreaterThan(39);
+    expect(row).toContain("27.4k / 200k ctx");
+  });
 });
 
 describe("parseHostJson", () => {
@@ -495,5 +584,39 @@ describe("runStatusline", () => {
     const code = await runStatusline(flags({ root }), { stdin: undefined });
     expect(code).toBe(2);
     expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it("fits every row into the columns it was given", async () => {
+    const code = await runStatusline(flags(), {
+      stdin: JSON.stringify({ transcript_path: BASIC }),
+      columns: 24,
+    });
+    expect(code).toBe(0);
+    for (const row of logged().split("\n")) {
+      expect(row.length).toBeLessThanOrEqual(24);
+    }
+  });
+});
+
+describe("panelWidth", () => {
+  const saved = process.env.COLUMNS;
+
+  afterEach(() => {
+    if (saved === undefined) delete process.env.COLUMNS;
+    else process.env.COLUMNS = saved;
+  });
+
+  it("reads COLUMNS, the only width a captured statusline is told", () => {
+    process.env.COLUMNS = "72";
+    expect(panelWidth()).toBe(72);
+  });
+
+  it("ignores a COLUMNS that is not a usable width", () => {
+    // Falls through to stdout.columns, which is undefined under a
+    // captured or piped test run.
+    for (const bad of ["", "wide", "0", "-10"]) {
+      process.env.COLUMNS = bad;
+      expect(panelWidth()).toBe(process.stdout.columns);
+    }
   });
 });

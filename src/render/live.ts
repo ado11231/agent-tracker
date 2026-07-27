@@ -9,6 +9,7 @@ import { emptyHostFacts, type HostFacts } from "../parser/host.js";
 import { fmtTokens, fmtUsd, shortModel } from "./format.js";
 import type { GlyphSet } from "./glyphs.js";
 import type { Style } from "./style.js";
+import { displayWidth } from "./text.js";
 
 // Shared one-line renderer for the live surfaces: the statusline
 // (printed once per assistant message by Claude Code) and the compact
@@ -57,6 +58,13 @@ export function currentContext(session: ExtractedSession): CurrentContext {
 // decoration. Context and rate limit shift green to yellow to red as
 // they fill, warning before compaction and before a cutoff. Cache hit
 // is inverted, since a low cache share is the expensive case.
+//
+// On a narrow terminal a row that does not fit is dropped from the
+// right, one field at a time, rather than wrapped. A wrapped statusline
+// costs a whole extra line of the user's screen and reads as broken,
+// while a shortened one still answers the question the row exists for:
+// the fields are already ordered most to least important, left to
+// right, so the tail is what can go.
 
 export interface PanelOptions {
   c: Style;
@@ -68,9 +76,16 @@ export interface PanelOptions {
   // Everything else the host told us about the live session. Defaults
   // to all absent, which is what a manual run from a shell gets.
   host?: HostFacts;
+  // Columns available for one row. Undefined means unknown, and an
+  // unknown width never shortens anything: guessing narrow would hide
+  // fields on a wide terminal, which is the worse mistake.
+  width?: number;
 }
 
 const GAUGE_WIDTH = 14;
+// Plain spacing after a gauge, wider than the dot separator so the bar
+// reads as its own object rather than as the first field in a list.
+const GAUGE_GAP = "   ";
 const GAUGE_WARN = 0.5;
 const GAUGE_DANGER = 0.8;
 
@@ -127,8 +142,46 @@ function gauge(ratio: number, paint: Paint, g: GlyphSet): string {
   return `${paint(bar(ratio, g))}  ${paint(pct(ratio).padStart(4))}`;
 }
 
-function join(parts: (string | undefined)[], sep: string): string {
-  return parts.filter((part): part is string => part !== undefined).join(sep);
+// One row before it is fitted to the terminal. The lead is the field
+// that gives the row its reason to exist and is never dropped, so a
+// row is either absent or still says something.
+interface PanelRow {
+  lead: string;
+  parts: string[];
+  // Between the lead and the first surviving part. Differs from sep on
+  // the gauge rows, where the gauge is set off by plain spacing.
+  gap: string;
+  // Between the parts.
+  sep: string;
+}
+
+// Builds a row from its fields in priority order, the first present
+// one leading. Absent fields are dropped here, before any fitting, so
+// a field the session has no data for never costs a field the terminal
+// had room for.
+function panelRow(
+  fields: (string | undefined)[],
+  sep: string,
+  gap: string = sep,
+): PanelRow {
+  const present = fields.filter((field): field is string => field !== undefined);
+  return { lead: present[0] ?? "", parts: present.slice(1), gap, sep };
+}
+
+// Widths are measured on the styled strings: string-width ignores ansi
+// escapes, so there is no need to keep a plain copy of every field in
+// step with the painted one.
+function fitRow(row: PanelRow, width: number | undefined): string {
+  let parts = row.parts;
+  for (;;) {
+    const text =
+      parts.length === 0
+        ? row.lead
+        : `${row.lead}${row.gap}${parts.join(row.sep)}`;
+    if (width === undefined || parts.length === 0) return text;
+    if (displayWidth(text) <= width) return text;
+    parts = parts.slice(0, -1);
+  }
 }
 
 // Row 1 — which session this is and what is running in it.
@@ -137,14 +190,14 @@ function identityRow(
   context: CurrentContext,
   options: PanelOptions,
   host: HostFacts,
-): string {
+): PanelRow {
   const { c } = options;
   const model = context.model ?? summary.models[summary.models.length - 1];
   // The session name answers "which of my terminals is this", which is
   // the question a name is for. A subagent's name stands in only when
   // the session has none, rather than taking a second segment.
   const name = host.sessionName ?? host.agentName;
-  return join(
+  return panelRow(
     [
       name === undefined ? undefined : c.bold(name),
       model === undefined ? undefined : modelColor(c, model)(shortModel(model)),
@@ -163,7 +216,7 @@ function costRow(
   summary: SessionSummary,
   options: PanelOptions,
   host: HostFacts,
-): string {
+): PanelRow {
   const { c, g } = options;
   const known = summary.total.unknownModels.length === 0;
   const burn = known
@@ -172,7 +225,7 @@ function costRow(
   const wasted = known && summary.offBranch.usd > 0 ? summary.offBranch.usd : 0;
   const added = host.linesAdded ?? 0;
   const removed = host.linesRemoved ?? 0;
-  return join(
+  return panelRow(
     [
       c.bold(known ? fmtUsd(summary.total.usd) : "$?"),
       burn === undefined ? undefined : `${fmtUsd(burn)}/hr`,
@@ -185,15 +238,17 @@ function costRow(
   );
 }
 
-// Row 3 — how much of the context window is gone.
-function contextRow(tokens: number, options: PanelOptions): string {
+// Row 3 — how much of the context window is gone. The gauge leads and
+// stays: it carries the percentage, so a narrow terminal loses the
+// raw token counts and keeps the answer.
+function contextRow(tokens: number, options: PanelOptions): PanelRow {
   const { c, g } = options;
   const ratio = Math.min(tokens / options.contextWindow, 1);
   const paint = fillPaint(c, ratio);
   const detail = `${fmtTokens(tokens)} / ${fmtTokens(options.contextWindow)} ctx`;
   // The token detail takes the gauge's color too: it is the same
   // measurement, and it has to stay readable at statusline size.
-  return `${gauge(ratio, paint, g)}   ${paint(detail)}`;
+  return panelRow([gauge(ratio, paint, g), paint(detail)], GAUGE_GAP);
 }
 
 // Row 4 — how much quota is left, plus the cache share, which belongs
@@ -208,7 +263,7 @@ function limitsRow(
   summary: SessionSummary,
   options: PanelOptions,
   host: HostFacts,
-): string | undefined {
+): PanelRow | undefined {
   const { c, g } = options;
   const cache =
     summary.total.messages > 0 ? cacheHitRatio(summary.total) : undefined;
@@ -220,9 +275,12 @@ function limitsRow(
     const ratio = host.fiveHour.usedPercentage / 100;
     const paint = fillPaint(c, ratio);
     const week = host.sevenDay;
-    return `${gauge(ratio, paint, g)}   ${join(
+    return panelRow(
       [
-        paint("5h"),
+        // The window label rides with the gauge instead of being a
+        // droppable field of its own, so the row still says which
+        // limit it is drawing at any width.
+        `${gauge(ratio, paint, g)}${GAUGE_GAP}${paint("5h")}`,
         week === undefined
           ? undefined
           : fillPaint(c, week.usedPercentage / 100)(
@@ -231,12 +289,12 @@ function limitsRow(
         cacheText,
       ],
       sep,
-    )}`;
+    );
   }
 
   if (cache === undefined) return undefined;
   const paint = cachePaint(c, cache);
-  return `${gauge(cache, paint, g)}   ${paint("cache hit")}`;
+  return panelRow([gauge(cache, paint, g), paint("cache hit")], GAUGE_GAP);
 }
 
 export function statuslinePanel(
@@ -254,7 +312,7 @@ export function statuslinePanel(
   }
   const limits = limitsRow(summary, options, host);
   if (limits !== undefined) rows.push(limits);
-  return rows;
+  return rows.map((row) => fitRow(row, options.width));
 }
 
 // model · $cost · +$delta · <ctx> ctx · <turns> turns. Cost is

@@ -63,7 +63,7 @@ as the core, tighten the command surface, and ship a Claude Code plugin layer
 so the whole thing lives inside a running `claude` session, with the report
 commands on the side. One binary, four integration surfaces.
 
-### P1. CLI surface cleanup (in progress)
+### P1. CLI surface cleanup (done 2026-07-27)
 
 - `watch` merges into `view --follow --compact`. The old command stays as a
   hidden alias that forwards and prints a deprecation note on stderr. Its
@@ -84,10 +84,14 @@ commands on the side. One binary, four integration surfaces.
   underneath gives the peak day, longest streak, and current streak, with a
   `less …█ more` legend. `--json` carries `activity` and a `byDay` series.
   This supersedes the earlier "14-day rows with a small bar" idea — the year
-  heatmap is its superset. Still open: a `--month` flag that widens today and
-  this week to month totals (orthogonal, not built).
-- `statusline` reads `COLUMNS` and drops the rightmost fields per row at
-  narrow widths instead of wrapping.
+  heatmap is its superset. `--month` shipped alongside it (2026-07-26): it is
+  a one-rung zoom out of the two summary rows, {today, this week} becoming
+  {this week, this month}. There are no daily bars anywhere; the year grid is
+  the daily view.
+- `statusline` fits each row to `COLUMNS` (shipped 2026-07-27), dropping
+  fields from the right rather than wrapping onto a second line. The leading
+  field of a row never drops, an unknown width shortens nothing, and the `5h`
+  label rides with its gauge so a shortened quota row still names its window.
 - `doctor` is unchanged.
 - **Done when:** the help fits one screen, the merged follow modes behave the
   same as the commands they replace, and the new flags have tests.

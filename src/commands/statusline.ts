@@ -32,6 +32,9 @@ export interface StatuslineInput {
   // with no piped input. Injected so the resolution logic stays
   // testable without touching process.stdin.
   stdin: string | undefined;
+  // Columns to fit the panel into, or undefined for unknown. Injected
+  // for the same reason as stdin.
+  columns?: number | undefined;
 }
 
 // Claude Code's default window, and the extended tier. Both only
@@ -62,11 +65,23 @@ async function readStdin(): Promise<string | undefined> {
   return text === "" ? undefined : text;
 }
 
+// How wide one row may be. Claude Code captures our stdout to draw the
+// panel inside its own frame, so process.stdout.columns is undefined
+// exactly when it matters and COLUMNS is the only width the host can
+// hand us. A shell run has a real tty to ask instead. Unknown stays
+// undefined, which fits nothing rather than guessing narrow.
+export function panelWidth(): number | undefined {
+  const declared = Number.parseInt(process.env.COLUMNS ?? "", 10);
+  if (Number.isFinite(declared) && declared > 0) return declared;
+  return process.stdout.columns;
+}
+
 export async function runStatusline(
   flags: StatuslineFlags,
   input?: StatuslineInput,
 ): Promise<number> {
   const raw = input === undefined ? await readStdin() : input.stdin;
+  const width = input === undefined ? panelWidth() : input.columns;
   // Claude Code piped us JSON. Any failure from here on must stay
   // quiet and exit 0 so the user's status line never shows an error.
   const invoked = raw !== undefined;
@@ -141,6 +156,7 @@ export async function runStatusline(
     g: glyphsFor(flags.ascii),
     contextWindow: window,
     host,
+    width,
   })) {
     console.log(row);
   }

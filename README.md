@@ -76,6 +76,9 @@ between a cheap session and an expensive one.
 
 Every row and every field disappears when its data is missing, rather than
 showing a zero, so the panel shrinks to two rows when there is nothing to say.
+On a narrow terminal a row that does not fit drops its rightmost fields
+instead of wrapping onto a second line, keeping the field that gives the row
+its point: the session name, the cost, the gauge. Width comes from `COLUMNS`.
 Rate limits need a Pro or Max subscription; on an API plan the cache share
 takes the gauge instead. The context and rate gauges turn yellow then red as
 they fill; the cache gauge is the other way round, since a low cache share is
