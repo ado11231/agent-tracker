@@ -26,6 +26,16 @@ export interface GlyphSet {
   // quietest. The glyph carries the level on its own so the heatmap
   // reads with color stripped; green shading only reinforces it.
   heatRamp: [string, string, string, string, string];
+  // Box drawing pieces for the heatmap border: horizontal, vertical,
+  // and the four corners.
+  box: {
+    h: string;
+    v: string;
+    tl: string;
+    tr: string;
+    bl: string;
+    br: string;
+  };
   tools: Record<ToolCategory, string>;
 }
 
@@ -41,6 +51,7 @@ export const UNICODE_GLYPHS: GlyphSet = {
   gaugeFull: "▓",
   gaugeEmpty: "░",
   heatRamp: ["·", "░", "▒", "▓", "█"],
+  box: { h: "─", v: "│", tl: "┌", tr: "┐", bl: "└", br: "┘" },
   tools: {
     bash: "⚡",
     edit: "✎",
@@ -65,6 +76,7 @@ export const ASCII_GLYPHS: GlyphSet = {
   gaugeFull: "#",
   gaugeEmpty: "-",
   heatRamp: [".", ":", "+", "*", "#"],
+  box: { h: "-", v: "|", tl: "+", tr: "+", bl: "+", br: "+" },
   tools: {
     bash: "$",
     edit: "+",

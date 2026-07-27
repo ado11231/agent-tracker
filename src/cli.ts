@@ -1,6 +1,10 @@
 import { Command, Option } from "commander";
 import { version } from "../package.json";
-import { runDashboard } from "./commands/dashboard.js";
+import {
+  runDashboard,
+  HEATMAP_CATEGORIES,
+  type HeatmapCategory,
+} from "./commands/dashboard.js";
 import { runDoctor } from "./commands/doctor.js";
 import {
   runSessions,
@@ -39,6 +43,8 @@ interface RawOpts {
   export?: ExportFormat;
   output?: string;
   year?: boolean;
+  by?: HeatmapCategory;
+  month?: boolean;
 }
 
 function toFlags(opts: RawOpts): CommandFlags {
@@ -192,14 +198,24 @@ export function buildProgram(): Command {
   program.addCommand(watch, { hidden: true });
 
   // Running ccprism with no command shows the dashboard. --year adds
-  // the activity heatmap of daily cost; it lives on the root program
-  // because the bare dashboard is not a subcommand of its own.
+  // the activity heatmap of daily cost, --month widens the summary
+  // rows; both live on the root program because the bare dashboard is
+  // not a subcommand of its own.
   withGlobalFlags(program)
     .option("--year", "activity heatmap of daily cost over the past year")
+    .addOption(
+      new Option(
+        "--by <field>",
+        "color the --year heatmap by the day's top spender",
+      ).choices([...HEATMAP_CATEGORIES]),
+    )
+    .option("--month", "widen the summary rows from today/week to week/month")
     .action(async (opts: RawOpts) => {
       process.exitCode = await runDashboard({
         ...toFlags(opts),
         year: opts.year === true,
+        by: opts.by,
+        month: opts.month === true,
         ascii: opts.ascii === true,
       });
     });
@@ -210,8 +226,11 @@ export function buildProgram(): Command {
     "after",
     [
       "",
-      "Run with no command for the dashboard: today and this week, by",
-      "project and model.",
+      "Run with no command for the dashboard: today and this week, and",
+      "totals by project and model. Add --year for a contribution graph",
+      "of daily cost (--by model or --by project colors each day by its",
+      "top spender), or --month to widen the summary rows to week and",
+      "month.",
       "",
       "view --follow is the live form of view. It renders the session so",
       "far, then appends turns as they arrive. Add --compact for a cost",

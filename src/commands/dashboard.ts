@@ -9,12 +9,13 @@ import {
   type ActivityStats,
   type UsageRollup,
 } from "../cost/aggregate.js";
-import { SYNTHETIC_MODEL } from "../cost/cost.js";
+import { costOfUsage, SYNTHETIC_MODEL } from "../cost/cost.js";
 import {
   mergeToolBreakdowns,
   toolBreakdown,
   type ToolBreakdown,
 } from "../cost/tools.js";
+import { glyphsFor } from "../render/glyphs.js";
 import {
   fmtPercent,
   fmtTokens,
@@ -22,9 +23,12 @@ import {
   renderTable,
   shortModel,
 } from "../render/format.js";
-import { glyphsFor } from "../render/glyphs.js";
-import { heatmapRange, renderHeatmap } from "../render/heatmap.js";
-import { colorEnabled, makeStyle } from "../render/style.js";
+import {
+  heatmapRange,
+  renderHeatmap,
+  type HeatmapColoring,
+} from "../render/heatmap.js";
+import { colorEnabled, makeStyle, type Style } from "../render/style.js";
 import {
   inWindow,
   loadSessions,
@@ -34,9 +38,19 @@ import {
   type TimeWindow,
 } from "./load.js";
 
-// --year adds the activity heatmap; --ascii swaps its glyph ramp.
+// What the --year grid can be colored by, beyond the default cost
+// magnitude: the model or the project that dominated each day.
+export const HEATMAP_CATEGORIES = ["model", "project"] as const;
+export type HeatmapCategory = (typeof HEATMAP_CATEGORIES)[number];
+
+// The dashboard takes flags beyond the shared set: --year draws the
+// activity heatmap, --by colors it by a category, --month widens the
+// summary rows, and --ascii swaps the heatmap glyph ramp. All optional
+// so callers holding a plain CommandFlags still fit.
 export type DashboardFlags = CommandFlags & {
   year?: boolean;
+  by?: HeatmapCategory;
+  month?: boolean;
   ascii?: boolean;
 };
 
@@ -46,17 +60,85 @@ interface ProjectRow {
   rollup: UsageRollup;
 }
 
+// The dominant category per day, plus the categories ranked biggest
+// first. Kept color-free here so it can go straight into --json; the
+// hue is assigned later, only for the terminal render.
+interface DayCategories {
+  label: HeatmapCategory;
+  dayCategory: Map<string, string>;
+  order: string[];
+}
+
 interface Heatmap {
   from: Date;
   to: Date;
   weeks: number;
   daily: Map<string, number>;
   stats: ActivityStats;
+  category?: DayCategories;
+}
+
+// Reduces per-message spend into the single category that spent the
+// most on each day, and the overall ranking used for the legend.
+function dominantByDay(
+  rows: Iterable<{ day: string | undefined; category: string; usd: number }>,
+): { dayCategory: Map<string, string>; order: string[] } {
+  const perDay = new Map<string, Map<string, number>>();
+  const totals = new Map<string, number>();
+  for (const { day, category, usd } of rows) {
+    if (day === undefined) continue;
+    let byCat = perDay.get(day);
+    if (byCat === undefined) {
+      byCat = new Map();
+      perDay.set(day, byCat);
+    }
+    byCat.set(category, (byCat.get(category) ?? 0) + usd);
+    totals.set(category, (totals.get(category) ?? 0) + usd);
+  }
+  const dayCategory = new Map<string, string>();
+  for (const [day, byCat] of perDay) {
+    let best: string | undefined;
+    let bestUsd = -Infinity;
+    for (const [category, usd] of byCat) {
+      if (usd > bestUsd) {
+        bestUsd = usd;
+        best = category;
+      }
+    }
+    if (best !== undefined) dayCategory.set(day, best);
+  }
+  const order = [...totals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([category]) => category);
+  return { dayCategory, order };
+}
+
+// Distinct 16-color hues for categories, ranked spender first. Red is
+// left out: it means an error elsewhere in the tool. Cycles if there
+// are somehow more categories than hues.
+function buildColoring(category: DayCategories, c: Style): HeatmapColoring {
+  const palette = [c.cyan, c.magenta, c.yellow, c.blue, c.green];
+  const colorMap = new Map<string, (text: string) => string>();
+  category.order.forEach((name, i) => {
+    colorMap.set(name, palette[i % palette.length] ?? c.green);
+  });
+  return {
+    label: category.label,
+    dayCategory: category.dayCategory,
+    order: category.order,
+    colorOf: (name) => colorMap.get(name) ?? c.green,
+  };
 }
 
 function startOfLocalDay(date: Date): Date {
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function startOfLocalMonth(date: Date): Date {
+  const start = startOfLocalDay(date);
+  start.setDate(1);
   return start;
 }
 
@@ -90,6 +172,9 @@ export async function runDashboard(flags: DashboardFlags): Promise<number> {
   weekStart.setDate(weekStart.getDate() - 6);
   const week = rollupOf(
     allUsage.filter((u) => inWindow(u.timestamp, { since: weekStart })),
+  );
+  const thisMonth = rollupOf(
+    allUsage.filter((u) => inWindow(u.timestamp, { since: startOfLocalMonth(now) })),
   );
 
   const byProject = new Map<string, ProjectRow>();
@@ -133,14 +218,52 @@ export async function runDashboard(flags: DashboardFlags): Promise<number> {
     : sessions.length;
 
   let heatmap: Heatmap | undefined;
-  if (flags.year === true) {
+  // --by asks to color the grid, so it implies --year.
+  if (flags.year === true || flags.by !== undefined) {
     const daily = new Map<string, number>();
     for (const [key, rollup] of rollupByKey(allUsage, (u) => dayOf(u.timestamp))) {
       daily.set(key, rollup.usd);
     }
     const width = process.stdout.columns ?? 80;
     const { from, weeks } = heatmapRange(now, width);
-    heatmap = { from, to: now, weeks, daily, stats: activityStats(daily, from, now) };
+
+    // --by colors each day by whichever model or project spent the
+    // most that day. Model rides straight on each usage entry; project
+    // has to be joined back through the session it came from.
+    let category: DayCategories | undefined;
+    if (flags.by === "model") {
+      const { dayCategory, order } = dominantByDay(
+        allUsage
+          .filter((u) => u.model !== SYNTHETIC_MODEL)
+          .map((u) => ({
+            day: dayOf(u.timestamp),
+            category: shortModel(u.model),
+            usd: costOfUsage(u.usage, u.model) ?? 0,
+          })),
+      );
+      category = { label: "model", dayCategory, order };
+    } else if (flags.by === "project") {
+      const { dayCategory, order } = dominantByDay(
+        windowed.flatMap(({ session, usage }) => {
+          const project = projectLabel(session.summary);
+          return usage.map((u) => ({
+            day: dayOf(u.timestamp),
+            category: project,
+            usd: costOfUsage(u.usage, u.model) ?? 0,
+          }));
+        }),
+      );
+      category = { label: "project", dayCategory, order };
+    }
+
+    heatmap = {
+      from,
+      to: now,
+      weeks,
+      daily,
+      stats: activityStats(daily, from, now),
+      category,
+    };
   }
 
   if (flags.json) {
@@ -158,6 +281,7 @@ export async function runDashboard(flags: DashboardFlags): Promise<number> {
           cacheHitRatio: cacheHitRatio(total),
           today,
           week,
+          month: thisMonth,
           subagents,
           retries,
           byProject: projects.map((p) => ({
@@ -171,11 +295,20 @@ export async function runDashboard(flags: DashboardFlags): Promise<number> {
             ? {
                 activity: {
                   since: heatmap.from.toISOString(),
+                  by: heatmap.category?.label ?? null,
                   ...heatmap.stats,
                 },
                 byDay: [...heatmap.daily.entries()]
                   .sort((a, b) => a[0].localeCompare(b[0]))
-                  .map(([date, usd]) => ({ date, usd })),
+                  .map(([date, usd]) =>
+                    heatmap.category === undefined
+                      ? { date, usd }
+                      : {
+                          date,
+                          usd,
+                          category: heatmap.category.dayCategory.get(date) ?? null,
+                        },
+                  ),
               }
             : {}),
         },
@@ -192,6 +325,7 @@ export async function runDashboard(flags: DashboardFlags): Promise<number> {
       total,
       today,
       week,
+      month: thisMonth,
       subagents,
       retries,
       projects,
@@ -210,6 +344,7 @@ interface DashboardData {
   total: UsageRollup;
   today: UsageRollup;
   week: UsageRollup;
+  month: UsageRollup;
   subagents: UsageRollup;
   retries: UsageRollup;
   projects: ProjectRow[];
@@ -220,7 +355,8 @@ interface DashboardData {
 }
 
 function printDashboard(data: DashboardData, flags: DashboardFlags): void {
-  const { sessionCount, total, today, week, subagents, retries, projects, models, toolRows, windowGiven, heatmap } = data;
+  const { sessionCount, total, today, week, month, subagents, retries, projects, models, toolRows, windowGiven, heatmap } = data;
+  const monthView = flags.month === true;
   const c = makeStyle(colorEnabled(flags.color));
   const lines: string[] = [];
   const dot = c.dim("·");
@@ -240,6 +376,11 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
       weeks: heatmap.weeks,
       glyphs: glyphsFor(flags.ascii === true),
       style: c,
+      width: process.stdout.columns ?? 80,
+      coloring:
+        heatmap.category === undefined
+          ? undefined
+          : buildColoring(heatmap.category, c),
     });
     for (const line of rendered) lines.push(line);
     lines.push("");
@@ -252,9 +393,17 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
     `${fmtTokens(rollup.tokens.output)} out`,
     `${fmtTokens(rollup.tokens.cacheRead)} cached`,
   ];
-  const spendRows = windowGiven
-    ? [spendRow("window", total)]
-    : [spendRow("today", today), spendRow("this week", week)];
+  // An explicit window collapses to a single row. Otherwise the two
+  // rows climb one rung of the ladder under --month: today/week
+  // becomes week/month.
+  let spendRows: string[][];
+  if (windowGiven) {
+    spendRows = [spendRow("window", total)];
+  } else if (monthView) {
+    spendRows = [spendRow("this week", week), spendRow("this month", month)];
+  } else {
+    spendRows = [spendRow("today", today), spendRow("this week", week)];
+  }
   for (const line of renderTable(spendRows, ["left", "right", "right", "right", "right"])) {
     lines.push(`  ${line}`);
   }

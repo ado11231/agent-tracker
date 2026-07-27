@@ -46,7 +46,7 @@ describe("heatmapRange", () => {
 
   it("shrinks from the left on a narrow terminal", () => {
     const to = new Date("2026-07-25T12:00:00");
-    expect(heatmapRange(to, 30).weeks).toBe(24); // 30 - 6 gutter
+    expect(heatmapRange(to, 30).weeks).toBe(22); // 30 - 6 gutter - 2 border
     expect(heatmapRange(to, 8).weeks).toBe(4); // floored, never vanishes
   });
 });
@@ -112,12 +112,36 @@ describe("renderHeatmap", () => {
     const lines = render(false);
     const text = lines.join("\n");
     expect(lines[0]).toContain("daily cost");
-    // caption, month header, seven rows, blank, stats, legend
-    expect(lines).toHaveLength(12);
+    // caption, month header, top border, seven rows, bottom border,
+    // blank, stats, legend
+    expect(lines).toHaveLength(14);
     for (const label of ["Mon", "Wed", "Fri"]) expect(text).toContain(label);
     expect(text).toContain("most active");
     expect(text).toContain("less ");
     expect(text).toContain(" more");
+  });
+
+  it("frames the grid with a border", () => {
+    const text = render(false).join("\n");
+    for (const piece of ["┌", "┐", "└", "┘", "│"]) {
+      expect(text).toContain(piece);
+    }
+  });
+
+  it("frames the grid with ascii box pieces under --ascii", () => {
+    const text = render(true).join("\n");
+    expect(text).toContain("+");
+    expect(text).toContain("|");
+    expect(text).not.toContain("│");
+  });
+
+  it("stretches the columns apart when the terminal is wide", () => {
+    const opts = { daily, stats, from, to, weeks, glyphs: glyphsFor(false), style: plain };
+    const gridRow = (ls: string[]) => ls.find((l) => l.includes("│"))?.length ?? 0;
+    const narrow = renderHeatmap({ ...opts, width: 80 });
+    const wide = renderHeatmap({ ...opts, width: 200 });
+    // Same weeks, but wider cells, so the framed rows are longer.
+    expect(gridRow(wide)).toBeGreaterThan(gridRow(narrow));
   });
 
   it("carries intensity in the glyph ramp with color stripped", () => {
@@ -134,10 +158,14 @@ describe("renderHeatmap", () => {
   });
 
   it("leaves future days blank in the final column", () => {
-    const rows = render(false).slice(2, 9); // the seven weekday rows
-    // Sunday (row 0) is `to` and renders a cell; Monday (row 1) is
-    // tomorrow, so its last column is a space.
-    expect(rows[0]?.endsWith(" ")).toBe(false);
-    expect(rows[1]?.endsWith(" ")).toBe(true);
+    // After the caption, month header, and top border, the seven
+    // weekday rows run to the bottom border.
+    const rows = render(false).slice(3, 10);
+    // Each row is framed, so strip the trailing border before looking
+    // at the final cell. Sunday (row 0) is `to` and renders a glyph;
+    // Monday (row 1) is tomorrow, so its last cell is a space.
+    const lastCell = (line?: string) => line?.replace(/│$/, "") ?? "";
+    expect(lastCell(rows[0]).endsWith(" ")).toBe(false);
+    expect(lastCell(rows[1]).endsWith(" ")).toBe(true);
   });
 });

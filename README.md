@@ -131,7 +131,7 @@ ccprism · 44 sessions · $578.54 · cache hit 98.8%
   this week  $346.80  12.3k in   1.9M out  425M cached
 
   project               sessions     cost
-  JrnymanApp                  20  $336.31
+  webapp                      20  $336.31
   ccprism                      9  $114.31
 ```
 

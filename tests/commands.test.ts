@@ -183,7 +183,9 @@ describe("dashboard", () => {
     // Default run carries no heatmap keys.
     let code = await runDashboard(flags(root));
     expect(code).toBe(0);
-    expect(JSON.parse(logged()).activity).toBeUndefined();
+    const bare = JSON.parse(logged());
+    expect(bare.activity).toBeUndefined();
+    expect(bare.byDay).toBeUndefined();
 
     logSpy.mockClear();
     code = await runDashboard({ ...flags(root), year: true });
@@ -205,6 +207,73 @@ describe("dashboard", () => {
     expect(text).toContain("daily cost");
     expect(text).toContain("Mon");
     expect(text).toContain("less ");
+  });
+
+  it("swaps the heatmap glyph ramp under --ascii", async () => {
+    const code = await runDashboard({
+      ...flags(await makeRoot(), { json: false }),
+      year: true,
+      ascii: true,
+    });
+    expect(code).toBe(0);
+    // The ascii ramp is . : + * # — none of the unicode ramp cells.
+    expect(logged()).not.toContain("█");
+    expect(logged()).not.toContain("▓");
+  });
+
+  it("colors the heatmap by model and implies --year", async () => {
+    const code = await runDashboard({ ...flags(await makeRoot()), by: "model" });
+    expect(code).toBe(0);
+    const out = JSON.parse(logged());
+    // --by turns the heatmap on without an explicit --year.
+    expect(out.activity).toBeDefined();
+    expect(out.activity.by).toBe("model");
+    // Every active day names the category that spent the most.
+    const active = out.byDay.filter((d: { usd: number }) => d.usd > 0);
+    expect(active.length).toBeGreaterThanOrEqual(1);
+    for (const day of active) expect(typeof day.category).toBe("string");
+  });
+
+  it("titles and lists the category legend in text with --by", async () => {
+    const code = await runDashboard({
+      ...flags(await makeRoot(), { json: false }),
+      by: "model",
+    });
+    expect(code).toBe(0);
+    const text = logged();
+    expect(text).toContain("by model");
+    // The legend names the model, and the fixtures are all opus.
+    expect(text).toContain("opus-4-8");
+  });
+
+  it("leaves the heatmap uncolored without --by", async () => {
+    const code = await runDashboard({ ...flags(await makeRoot()), year: true });
+    expect(code).toBe(0);
+    const out = JSON.parse(logged());
+    expect(out.activity.by).toBeNull();
+    expect(out.byDay.every((d: { category?: string }) => d.category === undefined)).toBe(true);
+  });
+
+  it("carries a month total in json", async () => {
+    const code = await runDashboard(flags(await makeRoot()));
+    expect(code).toBe(0);
+    const out = JSON.parse(logged());
+    expect(out.month).toMatchObject({
+      messages: expect.any(Number),
+      usd: expect.any(Number),
+    });
+  });
+
+  it("labels the summary rows for --month in text", async () => {
+    const code = await runDashboard({
+      ...flags(await makeRoot(), { json: false }),
+      month: true,
+    });
+    expect(code).toBe(0);
+    const text = logged();
+    // The two rows climb a rung: today drops off, this month appears.
+    expect(text).toContain("this month");
+    expect(text).toContain("this week");
   });
 });
 
