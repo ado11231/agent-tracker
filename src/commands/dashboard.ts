@@ -45,11 +45,10 @@ import {
 export const DASHBOARD_SPANS = ["week", "month", "year"] as const;
 export type DashboardSpan = (typeof DASHBOARD_SPANS)[number];
 
-// --ascii swaps the heatmap glyph ramp. Both optional so callers
-// holding a plain CommandFlags still fit.
+// --ascii swaps the heatmap glyph ramp (inherited from CommandFlags).
+// span stays optional so callers holding a plain CommandFlags still fit.
 export type DashboardFlags = CommandFlags & {
   span?: DashboardSpan;
-  ascii?: boolean;
 };
 
 interface ProjectRow {

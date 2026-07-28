@@ -27,7 +27,6 @@ export interface ViewFlags extends CommandFlags {
   id: string | undefined;
   full: boolean;
   costs: boolean;
-  ascii: boolean;
   follow: boolean;
   // The live cost log instead of the live transcript. Only a mode of
   // follow, never a shape of the static render, since the static

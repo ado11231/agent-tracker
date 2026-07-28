@@ -23,9 +23,7 @@ import { newestSessionPath, type CommandFlags } from "./load.js";
 // A statusLine command must never break its host, so every failure
 // path when invoked by Claude Code prints best effort and exits 0.
 
-export interface StatuslineFlags extends CommandFlags {
-  ascii: boolean;
-}
+export interface StatuslineFlags extends CommandFlags {}
 
 export interface StatuslineInput {
   // Raw JSON Claude Code piped in, or undefined when run from a shell

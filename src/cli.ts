@@ -39,19 +39,28 @@ function toFlags(opts: RawOpts): CommandFlags {
   return {
     json: opts.json === true,
     color: opts.color !== false,
+    ascii: opts.ascii === true,
     project: opts.project,
     since: opts.since,
     until: opts.until,
   };
 }
 
-// The flags every command accepts. Commander scopes options to one
-// command, so each command registers its own copy.
-function withGlobalFlags(command: Command): Command {
+// Truly universal: every handler reads both. Commander scopes options
+// to one command, so each command registers its own copy.
+function withCommonFlags(command: Command): Command {
   return command
     .option("--json", "machine readable output")
-    .option("--no-color", "plain output, also implied by NO_COLOR or piping")
-    .option("--ascii", "swap unicode glyphs for ascii")
+    .option("--no-color", "plain output, also implied by NO_COLOR or piping");
+}
+
+// The report scan narrowing flags. Only the commands that actually
+// consult loadSessions' time/cwd window take these, so view, doctor
+// (except --project) and statusline do not. --ascii is not here: it
+// is registered per-command on the ones whose render uses glyphs
+// (dashboard, statusline, view). sessions and doctor do not take it.
+function withReportWindowFlags(command: Command): Command {
+  return command
     .option("--project <path>", "only sessions from this project directory")
     .option("--since <date>", "window start, YYYY-MM-DD or an ISO timestamp")
     .option("--until <date>", "window end, inclusive");
@@ -72,22 +81,18 @@ export function buildProgram(): Command {
   // sessions that already exist. Commander orders the groups by first
   // registration, so the live commands are declared first to put them
   // at the top. Moving these blocks reorders the help.
-  withGlobalFlags(program.command("statusline"))
+  withCommonFlags(program.command("statusline"))
+    .option("--ascii", "swap unicode glyphs for ascii")
     .helpGroup(LIVE)
     .description(
       "Cost, context, and rate limit panel for Claude Code's custom statusLine",
     )
     .action(async (_opts: RawOpts, command: Command) => {
       const opts = command.optsWithGlobals() as RawOpts;
-      process.exitCode = await runStatusline({
-        ...toFlags(opts),
-        ascii: opts.ascii === true,
-      });
+      process.exitCode = await runStatusline(toFlags(opts));
     });
 
-  withGlobalFlags(
-    program.command("sessions"),
-  )
+  withReportWindowFlags(withCommonFlags(program.command("sessions")))
     .helpGroup(REPORTS)
     .description("List recent sessions with cost, duration, turns, and model")
     .option("--limit <n>", "rows to show, 0 for all", "20")
@@ -109,7 +114,8 @@ export function buildProgram(): Command {
       });
     });
 
-  withGlobalFlags(program.command("view"))
+  withCommonFlags(program.command("view"))
+    .option("--ascii", "swap unicode glyphs for ascii")
     .helpGroup(REPORTS)
     .description("Render a session transcript, latest session if id omitted")
     .argument("[id]", "session id, unambiguous prefixes accepted")
@@ -119,19 +125,17 @@ export function buildProgram(): Command {
     .option("--compact", "with --follow, a cost log instead of the transcript")
     // The path is optional, so --export alone writes ./<id>.md and
     // --export <path> writes there. One flag instead of a flag plus a
-    // second one that only ever meant anything alongside it.
-    .option("--export [path]", "write the transcript to a markdown file")
+    // second one that only ever meant anything alongside it. An export
+    // always expands: it is read later, with nobody around to rerun it.
+    .option("--export [path]", "write the transcript to a markdown file (always expanded)")
     .action(async (id: string | undefined, _opts: RawOpts, command: Command) => {
       const opts = command.optsWithGlobals() as RawOpts;
       const exportAs = opts.export !== undefined && opts.export !== false;
       process.exitCode = await runView({
         ...toFlags(opts),
         id,
-        // An export is read later, with nobody around to rerun it, so
-        // it always expands.
         full: opts.full === true || exportAs,
         costs: opts.costs === true,
-        ascii: opts.ascii === true,
         follow: opts.follow === true,
         compact: opts.compact === true,
         exportAs,
@@ -139,7 +143,8 @@ export function buildProgram(): Command {
       });
     });
 
-  withGlobalFlags(program.command("doctor"))
+  withCommonFlags(program.command("doctor"))
+    .option("--project <path>", "only sessions from this project directory")
     .helpGroup(REPORTS)
     .description("Report parse health: skipped lines and unknown model ids")
     .action(async (_opts: RawOpts, command: Command) => {
@@ -152,7 +157,8 @@ export function buildProgram(): Command {
   // far back to look, one rung at a time: week is today and this week,
   // month widens both rows, year adds the heatmap on top. It lives on
   // the root program because the bare dashboard is not a subcommand.
-  withGlobalFlags(program)
+  withReportWindowFlags(withCommonFlags(program))
+    .option("--ascii", "swap unicode glyphs for ascii")
     .addOption(
       new Option("--span <period>", "how far back the dashboard looks")
         .choices([...DASHBOARD_SPANS])
@@ -162,7 +168,6 @@ export function buildProgram(): Command {
       process.exitCode = await runDashboard({
         ...toFlags(opts),
         span: opts.span ?? "week",
-        ascii: opts.ascii === true,
       });
     });
 

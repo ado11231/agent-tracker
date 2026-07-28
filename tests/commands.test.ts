@@ -28,6 +28,7 @@ function flags(root: string, extra: Partial<CommandFlags> = {}): CommandFlags {
   return {
     json: true,
     color: false,
+    ascii: false,
     project: undefined,
     since: undefined,
     until: undefined,

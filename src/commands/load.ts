@@ -15,6 +15,7 @@ import type { ReadStats } from "../parser/types.js";
 export interface CommandFlags {
   json: boolean;
   color: boolean;
+  ascii: boolean;
   project: string | undefined;
   since: string | undefined;
   until: string | undefined;
