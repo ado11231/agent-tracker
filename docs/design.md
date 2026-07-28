@@ -204,10 +204,44 @@ Requirements:
 ### Design principles
 
 - **Dim is the primary tool, not bold.** A transcript is ~80% machinery;
-  dimming machinery makes conversation pop without shouting.
+  dimming machinery makes conversation pop without shouting. This holds for
+  the transcript only — see the opposite rule for the reports below.
 - **Every style must survive removal.**
 - Wrap at `min(terminal width, 100)`; use a string-width lib for
   unicode/emoji correctness.
+
+### Report coloring (2026-07-27, the inverse of the transcript rule)
+
+The transcript dims machinery so the conversation pops. The reports have no
+machinery to hide: every line is a number someone asked for. Dimming there
+just made the whole screen grey, which is what prompted this.
+
+**Dim is chrome only.** It survives on three things, none of which are text:
+the heatmap box border, the empty-day cells (they have to recede or the grid
+is noise), and the `·` separators in header lines. Anything that is a word
+carries a hue or weight instead.
+
+**A heading's hue names what is listed**, so the same colour means the same
+thing across commands:
+
+| Hue | Means | Where |
+| --- | --- | --- |
+| cyan | project | dashboard project table, `doctor` project slug, `of the total:` |
+| magenta | model | dashboard model table |
+| yellow | tool, and warnings | dashboard tool table, `doctor` issue marks, no-pricing note |
+| blue | session | `sessions` table heading |
+| green | healthy | `doctor` all clean |
+| red | reserved for errors | never used decoratively |
+
+Headings are styled **after** `renderTable` has padded them, since padding
+counts `.length` and would otherwise measure the escape codes. That is also
+why swapping a heading's hue can never shift a column, and why the tables
+stay aligned under `--no-color`.
+
+Where a label introduces a value, the **value** takes the weight, not the
+label: the heatmap stat strip reads `most active` plain then the date bold.
+Dimming the label and leaving the value plain, which is what it used to do,
+put the emphasis on the wrong half.
 
 ## 5. CLI surface (v1 — frozen)
 
@@ -449,16 +483,29 @@ Global (every command):
 | `--since <date>` / `--until <date>` | time window for metrics |
 
 `view` only: `--full` (expand raw commands, tool outputs, thinking),
-`--markdown` (Phase 3), `--costs` (per-message cost badges), `-f/--follow`
-(keep appending turns as the session grows).
+`--costs` (per-message cost badges), `-f/--follow` (keep appending turns as
+the session grows), `--compact` (with `--follow`, a cost log instead),
+`--export [path]` (write markdown, defaulting to `./<shortid>.md`).
 
-`sessions` only: `--limit <n>` (default 20, 0 shows all).
+`sessions` only: `--limit <n>` (default 20, 0 shows all), `--model <text>`,
+`--grep <text>`.
 
-Dashboard (bare `ccplus`) only: `--year` renders an activity heatmap of
-daily cost above the spend rows — a contribution graph capped at a rolling
-year, week columns and weekday rows, intensity on the glyph ramp so it
-survives `NO_COLOR`, with a most-active/longest/current-streak strip and a
-legend beneath. `--json` adds an `activity` object and a `byDay` series.
+Dashboard (bare `ccplus`) only: `--span week|month|year`, a single ladder
+where each rung keeps what the one below showed. `week` (the default) is
+today and this week; `month` widens both rows to this week and this month;
+`year` keeps those and renders an activity heatmap of daily cost above them
+— a contribution graph capped at a rolling year, week columns and weekday
+rows, magnitude on the glyph ramp so it survives `NO_COLOR` and hue naming
+the model that spent the most that day, with a most-active/longest/current
+streak strip and two legends beneath. `--json` adds an `activity` object and
+a `byDay` series carrying each day's top `model`.
+
+**Flag surface (2026-07-27):** 15 flags over 5 commands. Six are global
+(`--json`, `--no-color`, `--ascii`, `--project`, `--since`, `--until`); the
+rest are the ones listed above. Three were folded away in the same pass that
+cut the over built features: `--year` and `--month` became `--span`, `-o` was
+absorbed into `--export [path]`, and `--no-full` went with the rule that an
+export always expands, since it is read later by someone who cannot rerun it.
 
 ### UX rules
 

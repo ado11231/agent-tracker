@@ -101,7 +101,9 @@ export async function runDoctor(flags: CommandFlags): Promise<number> {
     lines.push(`  ${c.green("all clean")}, every line parsed and priced`);
   } else {
     for (const session of flagged) {
-      lines.push(`  ${c.bold(shortId(session.sessionId))}  ${c.dim(session.projectSlug)}`);
+      // Cyan is the project hue everywhere else, so it reads as one
+      // scheme rather than as this command having its own.
+      lines.push(`  ${c.bold(shortId(session.sessionId))}  ${c.cyan(session.projectSlug)}`);
       for (const issue of session.issues) {
         lines.push(`    ${c.yellow("!")} ${issue}`);
       }

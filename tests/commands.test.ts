@@ -187,7 +187,7 @@ describe("dashboard", () => {
     expect(bare.byDay).toBeUndefined();
 
     logSpy.mockClear();
-    code = await runDashboard({ ...flags(root), year: true });
+    code = await runDashboard({ ...flags(root), span: "year" });
     expect(code).toBe(0);
     const out = JSON.parse(logged());
     expect(out.activity.activeDays).toBeGreaterThanOrEqual(1);
@@ -199,7 +199,7 @@ describe("dashboard", () => {
     const code = await runDashboard({
       ...flags(await makeRoot()),
       json: false,
-      year: true,
+      span: "year",
     });
     expect(code).toBe(0);
     const text = logged();
@@ -211,7 +211,7 @@ describe("dashboard", () => {
   it("swaps the heatmap glyph ramp under --ascii", async () => {
     const code = await runDashboard({
       ...flags(await makeRoot(), { json: false }),
-      year: true,
+      span: "year",
       ascii: true,
     });
     expect(code).toBe(0);
@@ -221,7 +221,7 @@ describe("dashboard", () => {
   });
 
   it("names each day's top model in json under --year", async () => {
-    const code = await runDashboard({ ...flags(await makeRoot()), year: true });
+    const code = await runDashboard({ ...flags(await makeRoot()), span: "year" });
     expect(code).toBe(0);
     const out = JSON.parse(logged());
     expect(out.activity).toBeDefined();
@@ -234,7 +234,7 @@ describe("dashboard", () => {
   it("titles the grid by model and lists the model legend in text", async () => {
     const code = await runDashboard({
       ...flags(await makeRoot(), { json: false }),
-      year: true,
+      span: "year",
     });
     expect(code).toBe(0);
     const text = logged();
@@ -256,7 +256,7 @@ describe("dashboard", () => {
   it("labels the summary rows for --month in text", async () => {
     const code = await runDashboard({
       ...flags(await makeRoot(), { json: false }),
-      month: true,
+      span: "month",
     });
     expect(code).toBe(0);
     const text = logged();

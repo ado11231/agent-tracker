@@ -63,9 +63,11 @@ ccplus · 37 sessions · $561.78 · cache hit 98.9%
   opus-5         203   $36.34
 ```
 
-A tool table follows, with calls, failures and cost for each. `--month`
-swaps the top two rows for this week and this month. `--year` puts a
-contribution graph above it all:
+A tool table follows, with calls, failures and cost for each.
+
+`--span` decides how far back to look. `--span month` swaps the top two rows
+for this week and this month, and `--span year` keeps those and puts a
+contribution graph above them:
 
 ```
   daily cost · last 53 weeks · by model
@@ -107,7 +109,8 @@ commands, tool output and thinking. `--costs` puts a price on every tool
 call.
 
 `--export` writes it to markdown instead, which is what you want for a gist
-or a pull request. It lands at `./<id>.md` unless `-o` says otherwise.
+or a pull request. It lands at `./<id>.md`, or wherever you point it:
+`--export notes/session.md`.
 
 ## Statusline
 

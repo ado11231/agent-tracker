@@ -1,6 +1,10 @@
 import { Command, Option } from "commander";
 import { version } from "../package.json";
-import { runDashboard } from "./commands/dashboard.js";
+import {
+  runDashboard,
+  DASHBOARD_SPANS,
+  type DashboardSpan,
+} from "./commands/dashboard.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runSessions } from "./commands/sessions.js";
 import { runStatusline } from "./commands/statusline.js";
@@ -27,10 +31,8 @@ interface RawOpts {
   costs?: boolean;
   follow?: boolean;
   compact?: boolean;
-  export?: boolean;
-  output?: string;
-  year?: boolean;
-  month?: boolean;
+  export?: boolean | string;
+  span?: DashboardSpan;
 }
 
 function toFlags(opts: RawOpts): CommandFlags {
@@ -112,31 +114,28 @@ export function buildProgram(): Command {
     .description("Render a session transcript, latest session if id omitted")
     .argument("[id]", "session id, unambiguous prefixes accepted")
     .option("--full", "expand raw commands, tool outputs, and thinking")
-    // Declared so --export can expand by default and still be told
-    // not to. With both forms registered, neither one given leaves the
-    // value unset, which is what tells them apart.
-    .option("--no-full", "keep the compact render when exporting")
     .option("--costs", "per call cost badges on tool lines")
     .option("-f, --follow", "keep appending turns as the session grows")
     .option("--compact", "with --follow, a cost log instead of the transcript")
-    .option("--export", "write the transcript to a markdown file")
-    .option("-o, --output <path>", "where --export writes, default ./<id>.md")
+    // The path is optional, so --export alone writes ./<id>.md and
+    // --export <path> writes there. One flag instead of a flag plus a
+    // second one that only ever meant anything alongside it.
+    .option("--export [path]", "write the transcript to a markdown file")
     .action(async (id: string | undefined, _opts: RawOpts, command: Command) => {
       const opts = command.optsWithGlobals() as RawOpts;
-      const exportAs = opts.export === true;
+      const exportAs = opts.export !== undefined && opts.export !== false;
       process.exitCode = await runView({
         ...toFlags(opts),
         id,
-        // An export is meant to be read on its own later, with nobody
-        // around to rerun it with --full, so it expands unless asked
-        // not to.
-        full: opts.full ?? exportAs,
+        // An export is read later, with nobody around to rerun it, so
+        // it always expands.
+        full: opts.full === true || exportAs,
         costs: opts.costs === true,
         ascii: opts.ascii === true,
         follow: opts.follow === true,
         compact: opts.compact === true,
         exportAs,
-        out: opts.output,
+        out: typeof opts.export === "string" ? opts.export : undefined,
       });
     });
 
@@ -149,18 +148,20 @@ export function buildProgram(): Command {
       );
     });
 
-  // Running ccplus with no command shows the dashboard. --year adds
-  // the activity heatmap of daily cost, --month widens the summary
-  // rows; both live on the root program because the bare dashboard is
-  // not a subcommand of its own.
+  // Running ccplus with no command shows the dashboard. --span is how
+  // far back to look, one rung at a time: week is today and this week,
+  // month widens both rows, year adds the heatmap on top. It lives on
+  // the root program because the bare dashboard is not a subcommand.
   withGlobalFlags(program)
-    .option("--year", "activity heatmap of daily cost, colored by model")
-    .option("--month", "widen the summary rows from today/week to week/month")
+    .addOption(
+      new Option("--span <period>", "how far back the dashboard looks")
+        .choices([...DASHBOARD_SPANS])
+        .default("week"),
+    )
     .action(async (opts: RawOpts) => {
       process.exitCode = await runDashboard({
         ...toFlags(opts),
-        year: opts.year === true,
-        month: opts.month === true,
+        span: opts.span ?? "week",
         ascii: opts.ascii === true,
       });
     });
@@ -172,9 +173,9 @@ export function buildProgram(): Command {
     [
       "",
       "Run with no command for the dashboard: today and this week, and",
-      "totals by project and model. Add --year for a contribution graph",
-      "of daily cost, each day colored by the model that spent the most",
-      "on it, or --month to widen the summary rows to week and month.",
+      "totals by project, model and tool. --span month widens the two",
+      "summary rows, and --span year adds a contribution graph of daily",
+      "cost, each day colored by the model that spent the most on it.",
       "",
       "view --follow is the live form of view. It renders the session so",
       "far, then appends turns as they arrive. Add --compact for a cost",

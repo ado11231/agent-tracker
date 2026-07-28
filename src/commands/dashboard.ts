@@ -38,13 +38,17 @@ import {
   type TimeWindow,
 } from "./load.js";
 
-// The dashboard takes flags beyond the shared set: --year draws the
-// activity heatmap, --month widens the summary rows, and --ascii swaps
-// the heatmap glyph ramp. All optional so callers holding a plain
-// CommandFlags still fit.
+// How far back the dashboard looks, one rung at a time. Each step
+// zooms out and keeps what the step below showed: week is today and
+// this week, month widens both rows, year adds the activity heatmap
+// on top of the month rows.
+export const DASHBOARD_SPANS = ["week", "month", "year"] as const;
+export type DashboardSpan = (typeof DASHBOARD_SPANS)[number];
+
+// --ascii swaps the heatmap glyph ramp. Both optional so callers
+// holding a plain CommandFlags still fit.
 export type DashboardFlags = CommandFlags & {
-  year?: boolean;
-  month?: boolean;
+  span?: DashboardSpan;
   ascii?: boolean;
 };
 
@@ -210,7 +214,7 @@ export async function runDashboard(flags: DashboardFlags): Promise<number> {
     : sessions.length;
 
   let heatmap: Heatmap | undefined;
-  if (flags.year === true) {
+  if (flags.span === "year") {
     const daily = new Map<string, number>();
     for (const [key, rollup] of rollupByKey(allUsage, (u) => dayOf(u.timestamp))) {
       daily.set(key, rollup.usd);
@@ -326,7 +330,9 @@ interface DashboardData {
 
 function printDashboard(data: DashboardData, flags: DashboardFlags): void {
   const { sessionCount, total, today, week, month, subagents, retries, projects, models, toolRows, windowGiven, heatmap } = data;
-  const monthView = flags.month === true;
+  // month and year both widen the rows; year additionally draws the
+  // grid above them.
+  const wideRows = flags.span === "month" || flags.span === "year";
   const c = makeStyle(colorEnabled(flags.color));
   const lines: string[] = [];
   const dot = c.dim("·");
@@ -361,12 +367,12 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
     `${fmtTokens(rollup.tokens.cacheRead)} cached`,
   ];
   // An explicit window collapses to a single row. Otherwise the two
-  // rows climb one rung of the ladder under --month: today/week
+  // rows climb one rung of the ladder as --span widens: today/week
   // becomes week/month.
   let spendRows: string[][];
   if (windowGiven) {
     spendRows = [spendRow("window", total)];
-  } else if (monthView) {
+  } else if (wideRows) {
     spendRows = [spendRow("this week", week), spendRow("this month", month)];
   } else {
     spendRows = [spendRow("today", today), spendRow("this week", week)];
