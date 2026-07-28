@@ -43,7 +43,6 @@ function sessionFlags(
   return {
     ...flags(root),
     limit: 20,
-    sort: "time",
     model: undefined,
     grep: undefined,
     ...extra,
@@ -102,7 +101,7 @@ async function writeSearchable(
 }
 
 async function makeRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "ccprism-commands-"));
+  const root = await mkdtemp(join(tmpdir(), "ccplus-commands-"));
   const projectA = join(root, "-scrubbed-projectA");
   const projectB = join(root, "-scrubbed-projectB");
   await mkdir(projectA);
@@ -146,7 +145,7 @@ describe("dashboard", () => {
   });
 
   it("exits 2 when there are no sessions", async () => {
-    const empty = await mkdtemp(join(tmpdir(), "ccprism-empty-"));
+    const empty = await mkdtemp(join(tmpdir(), "ccplus-empty-"));
     expect(await runDashboard(flags(empty))).toBe(2);
   });
 
@@ -172,7 +171,7 @@ describe("dashboard", () => {
     const code = await runDashboard(flags(await makeRoot(), { json: false }));
     expect(code).toBe(0);
     const text = logged();
-    expect(text).toContain("ccprism");
+    expect(text).toContain("ccplus");
     expect(text).toContain("today");
     expect(text).toContain("model");
     expect(text).not.toContain("[");
@@ -221,37 +220,27 @@ describe("dashboard", () => {
     expect(logged()).not.toContain("▓");
   });
 
-  it("colors the heatmap by model and implies --year", async () => {
-    const code = await runDashboard({ ...flags(await makeRoot()), by: "model" });
+  it("names each day's top model in json under --year", async () => {
+    const code = await runDashboard({ ...flags(await makeRoot()), year: true });
     expect(code).toBe(0);
     const out = JSON.parse(logged());
-    // --by turns the heatmap on without an explicit --year.
     expect(out.activity).toBeDefined();
-    expect(out.activity.by).toBe("model");
-    // Every active day names the category that spent the most.
+    // Every day with spend names the model that spent the most on it.
     const active = out.byDay.filter((d: { usd: number }) => d.usd > 0);
     expect(active.length).toBeGreaterThanOrEqual(1);
-    for (const day of active) expect(typeof day.category).toBe("string");
+    for (const day of active) expect(typeof day.model).toBe("string");
   });
 
-  it("titles and lists the category legend in text with --by", async () => {
+  it("titles the grid by model and lists the model legend in text", async () => {
     const code = await runDashboard({
       ...flags(await makeRoot(), { json: false }),
-      by: "model",
+      year: true,
     });
     expect(code).toBe(0);
     const text = logged();
     expect(text).toContain("by model");
     // The legend names the model, and the fixtures are all opus.
     expect(text).toContain("opus-4-8");
-  });
-
-  it("leaves the heatmap uncolored without --by", async () => {
-    const code = await runDashboard({ ...flags(await makeRoot()), year: true });
-    expect(code).toBe(0);
-    const out = JSON.parse(logged());
-    expect(out.activity.by).toBeNull();
-    expect(out.byDay.every((d: { category?: string }) => d.category === undefined)).toBe(true);
   });
 
   it("carries a month total in json", async () => {
@@ -294,24 +283,14 @@ describe("sessions", () => {
     expect(JSON.parse(logged())).toHaveLength(1);
   });
 
-  // Every sort runs biggest first, so each of these asserts the same
-  // shape against a different number.
-  it("sorts by cost, duration, and turns, biggest first", async () => {
-    const root = await makeRoot();
-    for (const sort of ["cost", "duration", "turns"] as const) {
-      logSpy.mockClear();
-      const code = await runSessions(sessionFlags(root, { sort }));
-      expect(code).toBe(0);
-      const rows = JSON.parse(logged());
-      const values = rows.map((row: Record<string, number>) =>
-        sort === "cost"
-          ? (row.rollup as unknown as { usd: number }).usd
-          : sort === "duration"
-            ? row.durationMs
-            : row.turns,
-      );
-      expect(values).toEqual([...values].sort((a, b) => b - a));
-    }
+  it("lists the newest session first", async () => {
+    const code = await runSessions(sessionFlags(await makeRoot()));
+    expect(code).toBe(0);
+    const rows = JSON.parse(logged());
+    const times = rows.map((row: { lastTimestamp: string }) =>
+      new Date(row.lastTimestamp).getTime(),
+    );
+    expect(times).toEqual([...times].sort((a, b) => b - a));
   });
 
   it("keeps only sessions that used a matching model", async () => {
@@ -385,12 +364,12 @@ describe("doctor", () => {
   });
 
   it("exits 2 when there are no sessions", async () => {
-    const empty = await mkdtemp(join(tmpdir(), "ccprism-empty-"));
+    const empty = await mkdtemp(join(tmpdir(), "ccplus-empty-"));
     expect(await runDoctor(flags(empty))).toBe(2);
   });
 
   it("does not flag stub sessions holding only metadata lines", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ccprism-stub-"));
+    const root = await mkdtemp(join(tmpdir(), "ccplus-stub-"));
     const project = join(root, "-scrubbed-stub");
     await mkdir(project);
     await writeFile(

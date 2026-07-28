@@ -47,7 +47,7 @@ function flags(root: string, extra: Partial<ViewFlags> = {}): ViewFlags {
     ascii: false,
     follow: false,
     compact: false,
-    exportAs: undefined,
+    exportAs: false,
     out: undefined,
     ...extra,
   };
@@ -55,7 +55,7 @@ function flags(root: string, extra: Partial<ViewFlags> = {}): ViewFlags {
 
 // basic.jsonl is the newer session, compact.jsonl the older one.
 async function makeRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "ccprism-view-"));
+  const root = await mkdtemp(join(tmpdir(), "ccplus-view-"));
   const project = join(root, "-scrubbed-project");
   await mkdir(project);
   const older = join(project, "22222222-aaaa-bbbb-cccc-000000000002.jsonl");
@@ -112,7 +112,7 @@ describe("view", () => {
   });
 
   it("exits 2 on an empty root", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ccprism-view-empty-"));
+    const root = await mkdtemp(join(tmpdir(), "ccplus-view-empty-"));
     const code = await runView(flags(root));
     expect(code).toBe(2);
   });
@@ -140,7 +140,7 @@ describe("view", () => {
     const root = await makeRoot();
     const out = join(root, "session.md");
     const code = await runView(
-      flags(root, { id: "1111", exportAs: "md", out, full: true }),
+      flags(root, { id: "1111", exportAs: true, out, full: true }),
     );
     expect(code).toBe(0);
     expect(logged()).toContain("wrote");
@@ -151,27 +151,14 @@ describe("view", () => {
     expect(text).not.toContain("[1m");
   });
 
-  it("exports html with the color roles carried across", async () => {
-    const root = await makeRoot();
-    const out = join(root, "session.html");
-    const code = await runView(
-      flags(root, { id: "1111", exportAs: "html", out, full: true }),
-    );
-    expect(code).toBe(0);
-    const text = await readFile(out, "utf8");
-    expect(text.startsWith("<!doctype html>")).toBe(true);
-    expect(text).toContain("<span class=");
-    expect(text).not.toContain("[1m");
-  });
-
   it("reports the written path as json", async () => {
     const root = await makeRoot();
     const out = join(root, "session.md");
     const code = await runView(
-      flags(root, { id: "1111", exportAs: "md", out, json: true }),
+      flags(root, { id: "1111", exportAs: true, out, json: true }),
     );
     expect(code).toBe(0);
-    expect(JSON.parse(logged())).toEqual({ path: out, format: "md" });
+    expect(JSON.parse(logged())).toEqual({ path: out });
   });
 
   it("exits 1 when the path cannot be written", async () => {
@@ -179,7 +166,7 @@ describe("view", () => {
     const code = await runView(
       flags(root, {
         id: "1111",
-        exportAs: "md",
+        exportAs: true,
         out: join(root, "no", "such", "dir", "s.md"),
       }),
     );
@@ -192,7 +179,7 @@ describe("view", () => {
   it("refuses to export a followed session", async () => {
     const root = await makeRoot();
     const code = await runView(
-      flags(root, { id: "1111", exportAs: "md", follow: true }),
+      flags(root, { id: "1111", exportAs: true, follow: true }),
     );
     expect(code).toBe(2);
     expect(errored()).toContain("cannot follow");

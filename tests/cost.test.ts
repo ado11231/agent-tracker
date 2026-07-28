@@ -69,6 +69,7 @@ describe("costOfUsage", () => {
 
 describe("pricing table", () => {
   it("covers the model ids seen in real logs on this machine", () => {
+    expect(pricingFor("claude-opus-5")).toBeDefined();
     expect(pricingFor("claude-opus-4-8")).toBeDefined();
     expect(pricingFor("claude-fable-5")).toBeDefined();
   });

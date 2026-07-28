@@ -92,7 +92,7 @@ export async function runDoctor(flags: CommandFlags): Promise<number> {
   const c = makeStyle(colorEnabled(flags.color));
   const lines: string[] = [];
   lines.push(
-    `${c.bold("ccprism doctor")} ${c.dim("·")} ${sessions.length} sessions ` +
+    `${c.bold("ccplus doctor")} ${c.dim("·")} ${sessions.length} sessions ` +
       `${c.dim("·")} ${totalLines.toLocaleString()} lines read`,
   );
   lines.push("");

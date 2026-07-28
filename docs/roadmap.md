@@ -21,7 +21,7 @@ Each phase ships something usable on its own.
 - `pricing.json` + five-tier cost function (unknown models degrade gracefully;
   cache writes split 5m/1h per design.md)
 - Aggregators: session / day / project / model
-- Commands: `ccprism` (dashboard), `ccprism sessions`
+- Commands: `ccplus` (dashboard), `ccplus sessions`
 - Differentiator metrics: cache hit ratio, cost per tool category, subagent
   split, tool call/failure stats, time metrics (duration, turns, gaps)
 - `doctor` command (parse health: skipped lines, unknown models)
@@ -29,7 +29,7 @@ Each phase ships something usable on its own.
 - **Done when:** numbers match a manual spot-check against one real session.
   Checked 2026-07-18 against the test project session (52e94664): cost,
   every token tier, message count, tool calls, and duration matched a jq
-  cross check exactly. The flat count said 7 turns where ccprism said 6,
+  cross check exactly. The flat count said 7 turns where ccplus said 6,
   and the extra line was a duplicated prompt on an abandoned branch, so
   the tree aware number is the correct one.
 - *Already a usable tool at this point.*
@@ -47,13 +47,66 @@ Each phase ships something usable on its own.
 
 ## Phase 3 — Polish
 
-- `view --markdown` — shareable transcript export (gists, PRs, docs)
-- `statusline` — one-line current-session cost/tokens for Claude Code's
-  custom statusline
-- `watch` — tail the active session, stream cost live
-- Help text that fits one screen; `view` with no args renders instantly
-- npm publish (MIT license)
+- ~~`view --markdown`~~ shipped as `view --export md|html` in P1
+- ~~`statusline`~~ shipped, then grew the context and rate limit gauges
+- ~~`watch`~~ shipped, then folded into `view --follow --compact` in P1
+- ~~Help text that fits one screen~~ root help is 38 lines including the
+  trailing notes on the dashboard and `view --follow`; `view` with no args
+  renders instantly
+- npm publish (MIT license): prepared 2026-07-27, not yet run
 - **Done when:** published, statusline works in your own daily setup.
+
+### Publish readiness (2026-07-27)
+
+The polish pass before the first release.
+
+- `claude-opus-5` added to `pricing.json`. It shipped after the seed, so every
+  recent session reported `$?`. See docs/design.md for the write up; this is
+  the standing rule below failing once in practice.
+- `package.json` gained `keywords`, `homepage`, `bugs`, and a
+  `prepublishOnly` that runs typecheck, tests, and build. That last one
+  matters because `cli.ts` imports `version` from `package.json` and tsup
+  inlines it at build time, so publishing without rebuilding would ship a
+  binary that reports the previous version.
+- Version set to `0.1.0`. `npm pack` carries four files and 30 kB: the
+  bundle, README, LICENSE, and package.json. The name is free on npm.
+- README rewritten against the real command surface. It had drifted: `watch`
+  was still documented as a top level command, and `--export`, `--year`,
+  `--month`, `--by`, `--sort`, `--model`, and `--grep` were all missing.
+- Left alone on purpose: pricing for models that no local log contains
+  (Opus 4.5 and older, Sonnet 4.5, the retired 3.x line). Guessing a rate is
+  worse than reporting the cost as unknown, and none of it can be checked
+  against a real log here, which is what the standing rule for this repo
+  requires.
+
+### Renamed to ccplus, and four features cut (2026-07-27)
+
+The name is `ccplus` everywhere except the local checkout directory, which
+stays at `ccprism` on purpose. Moving it would orphan the memory folder keyed
+to that path, and would split this project's own history into two names on
+the dashboard. The GitHub repo and the npm package are both `ccplus`.
+
+Four things were cut as over built. Together they took src from 5,149 lines
+to 4,845 and tests from 4,308 to 4,243.
+
+- **`--by model|project` on the heatmap.** The flag is gone. The `--year`
+  grid now always tints each day by its top model, which is what the flag was
+  used for in practice. The project category is gone with it: joining spend
+  back through each session's label only ever worked against live logs, since
+  scrubbed fixture cwds all collapse to one name. Removing the optional path
+  also killed dead code in `render/heatmap.ts`, because with coloring always
+  on the green magnitude ramp could never render. `paint` shrank to
+  `paintEmpty`, and the ramp legend is unconditionally neutral.
+- **HTML export.** `--export` is now a boolean writing markdown, rather than
+  `--export md|html`. A one member enum is not worth the surface. This took
+  the SGR state machine and the embedded stylesheet with it, about 106 lines.
+  The nice property that an export cannot drift from the terminal render is
+  unchanged, since markdown was always the plain render of the same lines.
+- **`sessions --sort`.** Four sort modes, where the reason to list sessions
+  is to find a recent one and `--grep` is what actually locates it. The list
+  is newest first, full stop.
+- **The hidden `watch` alias.** It preserved muscle memory for a command that
+  was never published, so there was nothing to preserve.
 
 ## Plugin plan (spec of 2026-07-21)
 
@@ -96,7 +149,7 @@ commands on the side. One binary, four integration surfaces.
 - **Done when:** the help fits one screen, the merged follow modes behave the
   same as the commands they replace, and the new flags have tests.
 
-### P2. `ccprism context [id]`
+### P2. `ccplus context [id]`
 
 Answers "what is filling the context window right now". Attributes active
 branch tokens by origin: prompt overhead, file reads grouped per path, tool
@@ -107,11 +160,11 @@ marked with `~`, never presented as exact. `--json` and an optional `--watch`.
 `view --follow` picks up a one line context summary when fill crosses 50, 80,
 and 90 percent.
 
-This is the feature that makes people pick ccprism over a pure cost reporter.
+This is the feature that makes people pick ccplus over a pure cost reporter.
 
 ### P3. Hooks
 
-A hidden `ccprism hook <event>` reads the hook JSON on stdin, resolves the
+A hidden `ccplus hook <event>` reads the hook JSON on stdin, resolves the
 session through `transcript_path`, and dispatches per event: Stop prints the
 turn cost delta and the new fill, plus a warning naming the top three
 consumers when fill crosses a threshold; PostToolUse warns when a result added
@@ -133,15 +186,15 @@ things to guess.
 wrappers that run the CLI with `--no-color`. A `plugin/` directory in the repo
 holds the manifest, hook registrations, command files, and the statusline
 entry, so it installs as one plugin. For people not using plugins,
-`ccprism install` and `ccprism uninstall` write and remove the same entries in
+`ccplus install` and `ccplus uninstall` write and remove the same entries in
 `~/.claude`, printing every path they touch.
 
-This amends the read only promise, on purpose: ccprism never writes outside
-its install unless you run `ccprism install`.
+This amends the read only promise, on purpose: ccplus never writes outside
+its install unless you run `ccplus install`.
 
 ### P5. MCP server (optional, last)
 
-`ccprism mcp`, a stdio server exposing read only `get_session_cost`,
+`ccplus mcp`, a stdio server exposing read only `get_session_cost`,
 `get_context_breakdown`, `get_wasted_spend`, and `search_sessions(query)`, so
 Claude itself can notice that context is mostly stale file reads and act on
 it. Only after P1 through P4 are stable.
@@ -168,7 +221,7 @@ back to two rows on an API plan.
 | Thinking | `thinking.enabled` | did not earn a badge next to effort |
 | Git + PR | `workspace.repo.name`, `git_worktree`, `pr.number`, `pr.review_state` | |
 
-**ccprism-only — from our own parse, and the actual differentiator:**
+**ccplus-only — from our own parse, and the actual differentiator:**
 
 | Metric | Notes |
 |---|---|
@@ -198,7 +251,7 @@ below.
 
 | # | Idea | Verdict |
 |---|---|---|
-| 1 | `ccprism top`, live view of every running session | Build as described |
+| 1 | `ccplus top`, live view of every running session | Build as described |
 | 2 | Real diff rendering in `view --full` | Build as described |
 | 3 | Blocks report for the 5 hour window | Needs a workaround, and one decision |
 | 4 | `daily` / `weekly` / `monthly` with `--breakdown` | Adds to work already scheduled |
@@ -220,7 +273,7 @@ up: item 2 first because the data is already there and it is self contained,
 then item 1 as the bigger piece, then 4 and 6 folded into the Phase 1 work
 they extend.
 
-**1. `ccprism top`, a live view of every running session.** The strongest of
+**1. `ccplus top`, a live view of every running session.** The strongest of
 the batch and the cleanest fit. One foreground process polling the log
 directory, so no daemon, no state file, nothing written. Shows every session
 with recent activity as a row: cost, context fill, last activity, model.

@@ -106,7 +106,8 @@ Requirements:
   lacks the `cache_creation` breakdown (older logs), fall back to
   pricing all of `cache_creation_input_tokens` at the 5m tier.
 - Seed pricing.json with the current Anthropic lineup plus every model ID
-  observed in real logs (this machine: `claude-opus-4-8`, `claude-fable-5`).
+  observed in real logs (this machine: `claude-opus-4-8`, `claude-fable-5`,
+  `claude-opus-5`).
   Model ID `<synthetic>` appears in logs for locally-generated placeholder
   messages — **skip it in costing entirely** (zero cost, not "unknown").
 - **Seeded 2026-07-17** (`src/cost/pricing.json`) with the full current
@@ -114,6 +115,13 @@ Requirements:
   and 5 ($3/$15), Haiku 4.5 ($1/$5); cache read is 0.1x input, writes are
   1.25x (5m) and 2x (1h). Rescan of all local logs the same day confirmed
   only `claude-opus-4-8`, `claude-fable-5`, and `<synthetic>` appear.
+- **Opus 5 added 2026-07-27.** `claude-opus-5` shipped after the seed and was
+  missing from the table, so every session on it reported `$?` for cost. A
+  rescan of all local logs now finds `claude-opus-4-8`, `claude-fable-5`,
+  `claude-opus-5`, and `<synthetic>`. Worth keeping as the worked example of
+  the standing rule: nothing crashed and nothing warned in the normal reports,
+  the tokens still counted, and `doctor` was the only place that named the
+  model. Rates are $5/$25, the same as Opus 4.8.
 - **Cache write tier in practice (verified 2026-07-17):** recent Claude Code
   sessions on this machine write cache entries exclusively at the 1h tier
   (the largest local session: 466,744 tokens at 1h, zero at 5m). The 5m
@@ -203,8 +211,8 @@ Requirements:
 
 ## 5. CLI surface (v1 — frozen)
 
-Install: `npx ccprism` (try it), `npm install -g ccprism` (keep it),
-`npm uninstall -g ccprism` (gone completely). Also works via `pnpm dlx` / `bunx`.
+Install: `npx ccplus` (try it), `npm install -g ccplus` (keep it),
+`npm uninstall -g ccplus` (gone completely). Also works via `pnpm dlx` / `bunx`.
 
 Trust guarantees: only ever **reads** `~/.claude/projects/`; no network, no
 telemetry, no config file, no state; uninstall leaves zero trace.
@@ -217,19 +225,19 @@ same two groups.
 
 ```
 Live:
-ccprism statusline         cost, context, and rate limit panel for statusLine
-ccprism watch [id]         tail a session, stream cost as it changes
-ccprism view --follow      the transcript, appended live as the session grows
+ccplus statusline         cost, context, and rate limit panel for statusLine
+ccplus watch [id]         tail a session, stream cost as it changes
+ccplus view --follow      the transcript, appended live as the session grows
 
 Reports:
-ccprism                    dashboard: today / week, per project & model
-ccprism sessions           recent sessions: cost, duration, turns, model
-ccprism view [id]          transcript (latest session if id omitted)
-ccprism doctor             parse health: skipped lines, unknown model IDs
+ccplus                    dashboard: today / week, per project & model
+ccplus sessions           recent sessions: cost, duration, turns, model
+ccplus view [id]          transcript (latest session if id omitted)
+ccplus doctor             parse health: skipped lines, unknown model IDs
 ```
 
 Two of those are features rather than commands and so cannot appear in a
-grouped command list: the bare `ccprism` dashboard, and `view --follow`. Both
+grouped command list: the bare `ccplus` dashboard, and `view --follow`. Both
 are covered by trailing help text instead.
 
 Commander orders help groups by **first registration**, so the live commands
@@ -244,7 +252,7 @@ Built for Claude Code's `statusLine` setting, which runs a command after each
 assistant message and pipes session JSON on stdin (schema:
 code.claude.com/docs/en/statusline). The anchor field is
 `transcript_path` — it names the exact session file, so there is no guessing
-by mtime. We parse that file with the normal pipeline and print **ccprism's
+by mtime. We parse that file with the normal pipeline and print **ccplus's
 own** cost, so the number matches `view` and the dashboard rather than echoing
 Claude Code's `cost.total_cost_usd`. Run from a shell with no piped input it
 falls back to the newest session, which makes it previewable.
@@ -293,7 +301,7 @@ still leads with a gauge rather than a lone number.
 
 `ctx` is the input side of the most recent main-thread API call (fresh input +
 cache reads + cache writes, output excluded — the same basis as Claude Code's
-`used_percentage`). The **token count is ccprism's own** so it agrees with
+`used_percentage`). The **token count is ccplus's own** so it agrees with
 `view` and the dashboard; only the **window size** is taken from the session
 JSON (`context_window.context_window_size`). On a manual run no size is sent,
 so one is inferred: context above 200k proves the extended tier, and assuming
@@ -345,7 +353,7 @@ PATH — absolute paths in the `command` avoid a silently blank bar.
 Settings snippet:
 
 ```json
-{ "statusLine": { "type": "command", "command": "ccprism statusline" } }
+{ "statusLine": { "type": "command", "command": "ccplus statusline" } }
 ```
 
 #### `watch`
@@ -446,7 +454,7 @@ Global (every command):
 
 `sessions` only: `--limit <n>` (default 20, 0 shows all).
 
-Dashboard (bare `ccprism`) only: `--year` renders an activity heatmap of
+Dashboard (bare `ccplus`) only: `--year` renders an activity heatmap of
 daily cost above the spend rows — a contribution graph capped at a rolling
 year, week columns and weekday rows, intensity on the glyph ramp so it
 survives `NO_COLOR`, with a most-active/longest/current-streak strip and a

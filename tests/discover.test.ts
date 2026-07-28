@@ -5,12 +5,12 @@ import { describe, expect, it } from "vitest";
 import { discoverSessionFiles } from "../src/parser/discover.js";
 
 async function makeRoot(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "ccprism-discover-"));
+  return mkdtemp(join(tmpdir(), "ccplus-discover-"));
 }
 
 describe("discoverSessionFiles", () => {
   it("returns an empty list for a missing root", async () => {
-    const files = await discoverSessionFiles("/nonexistent/ccprism-test-root");
+    const files = await discoverSessionFiles("/nonexistent/ccplus-test-root");
     expect(files).toEqual([]);
   });
 

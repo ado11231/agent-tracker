@@ -96,6 +96,18 @@ describe("renderHeatmap", () => {
   ]);
   const stats = activityStats(daily, from, to);
 
+  // Every day here is opus-4-8 except the biggest, so the legend has
+  // two entries with the bigger spender first.
+  const coloring = {
+    dayCategory: new Map([
+      ["2026-01-05", "opus-4-8"],
+      ["2026-01-06", "opus-4-8"],
+      ["2026-01-07", "fable-5"],
+    ]),
+    order: ["fable-5", "opus-4-8"],
+    colorOf: () => (text: string) => text,
+  };
+
   function render(ascii: boolean): string[] {
     return renderHeatmap({
       daily,
@@ -105,20 +117,29 @@ describe("renderHeatmap", () => {
       weeks,
       glyphs: glyphsFor(ascii),
       style: plain,
+      coloring,
     });
   }
 
-  it("draws a caption, seven weekday rows, a stat strip, and a legend", () => {
+  it("draws a caption, seven weekday rows, a stat strip, and two legends", () => {
     const lines = render(false);
     const text = lines.join("\n");
     expect(lines[0]).toContain("daily cost");
+    expect(lines[0]).toContain("by model");
     // caption, month header, top border, seven rows, bottom border,
-    // blank, stats, legend
-    expect(lines).toHaveLength(14);
+    // blank, stats, ramp legend, model legend
+    expect(lines).toHaveLength(15);
     for (const label of ["Mon", "Wed", "Fri"]) expect(text).toContain(label);
     expect(text).toContain("most active");
     expect(text).toContain("less ");
     expect(text).toContain(" more");
+  });
+
+  it("names the models in the second legend, biggest spender first", () => {
+    const legend = render(false).at(-1) ?? "";
+    expect(legend).toContain("fable-5");
+    expect(legend).toContain("opus-4-8");
+    expect(legend.indexOf("fable-5")).toBeLessThan(legend.indexOf("opus-4-8"));
   });
 
   it("frames the grid with a border", () => {
@@ -136,7 +157,10 @@ describe("renderHeatmap", () => {
   });
 
   it("stretches the columns apart when the terminal is wide", () => {
-    const opts = { daily, stats, from, to, weeks, glyphs: glyphsFor(false), style: plain };
+    const opts = {
+      daily, stats, from, to, weeks,
+      glyphs: glyphsFor(false), style: plain, coloring,
+    };
     const gridRow = (ls: string[]) => ls.find((l) => l.includes("│"))?.length ?? 0;
     const narrow = renderHeatmap({ ...opts, width: 80 });
     const wide = renderHeatmap({ ...opts, width: 200 });

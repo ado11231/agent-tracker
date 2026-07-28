@@ -86,21 +86,10 @@ export function levelOf(usd: number, t: [number, number, number]): number {
   return 4;
 }
 
-// The 16-color palette rule holds: the glyph already carries the
-// level, so color adds only a rising green. Level 0 dims to a faint
-// grey the way an empty gauge cell does.
-function paint(style: Style, level: number, ch: string): string {
-  switch (level) {
-    case 0:
-      return style.dim(ch);
-    case 1:
-    case 2:
-      return style.green(ch);
-    case 3:
-      return style.greenBright(ch);
-    default:
-      return style.bold(style.greenBright(ch));
-  }
+// A day with no spend has no model, so it dims to a faint grey the way
+// an empty gauge cell does. Every other day takes its model's hue.
+function paintEmpty(style: Style, ch: string): string {
+  return style.dim(ch);
 }
 
 // Month initials placed above the column where each new month begins,
@@ -129,17 +118,16 @@ function monthHeader(
     if (slots.slice(pos, pos + label.length).some((s) => s !== " ")) continue;
     for (let k = 0; k < label.length; k++) slots[pos + k] = label[k] ?? " ";
   }
-  return " ".repeat(lead) + style.dim(slots.join(""));
+  return " ".repeat(lead) + slots.join("");
 }
 
-// Optional second dimension: hue carries a category (the model or
-// project that dominated each day) while the glyph keeps carrying
-// magnitude. Kept optional so the plain grid is unchanged.
+// The second dimension: hue carries the model that dominated each day
+// while the glyph keeps carrying magnitude, so the grid answers both
+// "how much" and "which model" and still reads with color stripped.
 export interface HeatmapColoring {
-  label: string;
-  // Local day key → the category that spent the most that day.
+  // Local day key → the model that spent the most that day.
   dayCategory: Map<string, string>;
-  // Categories biggest first, the order the legend lists them.
+  // Models biggest first, the order the legend lists them.
   order: string[];
   colorOf: (category: string) => (text: string) => string;
 }
@@ -155,7 +143,7 @@ export interface HeatmapInput {
   weeks: number;
   glyphs: GlyphSet;
   style: Style;
-  coloring?: HeatmapColoring;
+  coloring: HeatmapColoring;
   // Terminal width, used only to decide how wide each week column can
   // stretch. Defaults to a plain 80.
   width?: number;
@@ -183,10 +171,7 @@ export function renderHeatmap(input: HeatmapInput): string[] {
   const thresholds = heatThresholds(shown);
 
   const lines: string[] = [];
-  const title = `daily cost · last ${weeks} weeks${
-    coloring !== undefined ? ` · by ${coloring.label}` : ""
-  }`;
-  lines.push(`  ${style.dim(title)}`);
+  lines.push(`  ${style.bold(`daily cost · last ${weeks} weeks · by model`)}`);
   // The month labels sit above the grid interior, one column past the
   // left border.
   lines.push(monthHeader(from, weeks, cell, GUTTER + BORDER / 2, style));
@@ -209,23 +194,20 @@ export function renderHeatmap(input: HeatmapInput): string[] {
       const key = localDayKey(date);
       const level = levelOf(daily.get(key) ?? 0, thresholds);
       const glyph = glyphs.heatRamp[level] ?? glyphs.heatRamp[0];
-      // With a coloring the glyph still carries magnitude; hue carries
-      // the category. An empty day has no category, so it stays dim.
-      if (coloring === undefined || level === 0) {
-        cells += paint(style, level, glyph);
-      } else {
-        const category = coloring.dayCategory.get(key);
-        cells +=
-          category === undefined
-            ? paint(style, level, glyph)
-            : coloring.colorOf(category)(glyph);
-      }
+      // The glyph carries magnitude, the hue carries the day's top
+      // model. An empty day has no model, so it stays dim.
+      const model = level === 0 ? undefined : coloring.dayCategory.get(key);
+      cells +=
+        model === undefined
+          ? paintEmpty(style, glyph)
+          : coloring.colorOf(model)(glyph);
       // The gap after every column spreads the grid apart and keeps
       // each cell the same width so the border lines up.
       cells += gap;
     }
     // Weekday label in the gutter, then the row framed by the border.
-    lines.push(`  ${style.dim(label)} ${style.dim(box.v)}${cells}${style.dim(box.v)}`);
+    // Only the frame dims: it is chrome, and the labels are text.
+    lines.push(`  ${label} ${style.dim(box.v)}${cells}${style.dim(box.v)}`);
   }
 
   lines.push(framePad + style.dim(box.bl + rule + box.br));
@@ -235,35 +217,34 @@ export function renderHeatmap(input: HeatmapInput): string[] {
     stats.mostActiveDay === undefined
       ? "—"
       : `${fmtWhen(`${stats.mostActiveDay}T00:00:00`, to)} · ${fmtUsd(stats.mostActiveUsd)}`;
+  // Label in plain text, value in bold, so the number is what carries
+  // the emphasis rather than the word introducing it.
   lines.push(
     "  " +
-      style.dim("most active ") +
-      when +
+      "most active " +
+      style.bold(when) +
       "   " +
-      style.dim("longest ") +
-      `${stats.longestStreak}d` +
+      "longest " +
+      style.bold(`${stats.longestStreak}d`) +
       "   " +
-      style.dim("current ") +
-      `${stats.currentStreak}d`,
+      "current " +
+      style.bold(`${stats.currentStreak}d`),
   );
 
-  // Without a coloring the ramp is green, reinforcing magnitude. With
-  // one, green would falsely read as a category, so the ramp goes
-  // neutral and the glyph shape alone says less-to-more.
-  const ramp =
-    coloring === undefined
-      ? glyphs.heatRamp.map((ch, i) => paint(style, i, ch)).join("")
-      : glyphs.heatRamp.map((ch, i) => (i === 0 ? style.dim(ch) : ch)).join("");
-  lines.push(`  ${style.dim("less ")}${ramp}${style.dim(" more")}`);
+  // The ramp stays neutral. Coloring it green would make green read as
+  // a model rather than as magnitude, so the glyph shape alone says
+  // less-to-more here.
+  const ramp = glyphs.heatRamp
+    .map((ch, i) => (i === 0 ? style.dim(ch) : ch))
+    .join("");
+  lines.push(`  less ${ramp} more`);
 
-  // Second legend: which hue is which category, biggest spender first.
-  if (coloring !== undefined) {
-    const swatch = glyphs.heatRamp[glyphs.heatRamp.length - 1] ?? "#";
-    const items = coloring.order.map(
-      (category) => `${coloring.colorOf(category)(swatch)} ${category}`,
-    );
-    if (items.length > 0) lines.push(`  ${items.join("   ")}`);
-  }
+  // Second legend: which hue is which model, biggest spender first.
+  const swatch = glyphs.heatRamp[glyphs.heatRamp.length - 1] ?? "#";
+  const items = coloring.order.map(
+    (model) => `${coloring.colorOf(model)(swatch)} ${model}`,
+  );
+  if (items.length > 0) lines.push(`  ${items.join("   ")}`);
 
   return lines;
 }

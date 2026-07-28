@@ -1,4 +1,4 @@
-# CLAUDE.md — ccprism
+# CLAUDE.md — ccplus
 
 > Standing context for any Claude Code session working on this project.
 

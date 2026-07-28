@@ -71,7 +71,7 @@ export interface PanelOptions {
   g: GlyphSet;
   // Total context window for the current model, from the session json
   // Claude Code pipes in. Only the size is taken from there; the token
-  // count stays ccprism's own so it agrees with view and the dashboard.
+  // count stays ccplus's own so it agrees with view and the dashboard.
   contextWindow: number;
   // Everything else the host told us about the live session. Defaults
   // to all absent, which is what a manual run from a shell gets.
@@ -316,7 +316,7 @@ export function statuslinePanel(
 }
 
 // model · $cost · +$delta · <ctx> ctx · <turns> turns. Cost is
-// ccprism's own number so it matches view and the dashboard; it reads
+// ccplus's own number so it matches view and the dashboard; it reads
 // $? when any model in the session has no pricing. The context segment
 // drops out before the first api call. Kept plain and on one line for
 // the compact append log, which pipes to a file.

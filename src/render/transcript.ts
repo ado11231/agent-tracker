@@ -494,7 +494,7 @@ export function renderTranscript(
     out.push("");
     out.push(
       ctx.c.dim(
-        `some usage has no pricing (${summary.total.unknownModels.map(shortModel).join(", ")}), see ccprism doctor`,
+        `some usage has no pricing (${summary.total.unknownModels.map(shortModel).join(", ")}), see ccplus doctor`,
       ),
     );
   }

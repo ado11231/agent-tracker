@@ -8,7 +8,7 @@ import {
 } from "../parser/discover.js";
 import type { ExtractedSession } from "../parser/events.js";
 import { parseSessionFile } from "../parser/session.js";
-import { EXPORT_WIDTH, toHtml, toMarkdown } from "../render/export.js";
+import { EXPORT_WIDTH, toMarkdown } from "../render/export.js";
 import { shortId } from "../render/format.js";
 import { glyphsFor } from "../render/glyphs.js";
 import {
@@ -33,14 +33,11 @@ export interface ViewFlags extends CommandFlags {
   // follow, never a shape of the static render, since the static
   // render is already the compact one and --full is its expansion.
   compact: boolean;
-  // Write the transcript to a file instead of the terminal.
-  exportAs: ExportFormat | undefined;
-  // Where to write it. Undefined means ./<shortid>.<format>.
+  // Write the transcript to a markdown file instead of the terminal.
+  exportAs: boolean;
+  // Where to write it. Undefined means ./<shortid>.md.
   out: string | undefined;
 }
-
-export const EXPORT_FORMATS = ["md", "html"] as const;
-export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
 // Both live modes poll, so they take the same options.
 export type ViewOptions = CompactOptions;
@@ -90,25 +87,23 @@ async function resolveTarget(flags: ViewFlags): Promise<Target> {
   return { code: 2 };
 }
 
-// Writes the transcript to a file. Markdown gets the plain render,
-// html gets the colored one converted to spans, so both come from the
-// same renderer the terminal uses and neither can drift from it.
+// Writes the transcript to a markdown file, using the plain render
+// from the same renderer the terminal uses, so an export can never
+// drift from what view prints.
 //
 // Width is fixed rather than read from the terminal: an exported file
 // outlives the window it was made in.
 async function runExport(
   flags: ViewFlags,
-  format: ExportFormat,
   file: SessionFile,
   session: ExtractedSession,
 ): Promise<number> {
-  const colored = format === "html";
   const ctx: RenderContext = {
-    c: makeStyle(colored),
+    c: makeStyle(false),
     g: glyphsFor(flags.ascii),
     width: EXPORT_WIDTH,
-    italic: colored,
-    color: colored,
+    italic: false,
+    color: false,
     full: flags.full,
     costs: flags.costs,
     cwd: session.meta.cwd,
@@ -117,9 +112,8 @@ async function runExport(
 
   const summary = summarizeSession(file, session);
   const lines = renderTranscript(assembleTranscript(session), summary, ctx);
-  const text =
-    format === "md" ? toMarkdown(lines, summary) : toHtml(lines, summary);
-  const path = flags.out ?? `${shortId(summary.sessionId)}.${format}`;
+  const text = toMarkdown(lines, summary);
+  const path = flags.out ?? `${shortId(summary.sessionId)}.md`;
 
   try {
     await writeFile(path, text, "utf8");
@@ -129,7 +123,7 @@ async function runExport(
   }
 
   if (flags.json) {
-    console.log(JSON.stringify({ path: resolve(path), format }));
+    console.log(JSON.stringify({ path: resolve(path) }));
   } else {
     console.log(`wrote ${path}`);
   }
@@ -142,7 +136,7 @@ export async function runView(
 ): Promise<number> {
   if (flags.compact && !flags.follow) {
     console.error(
-      "--compact is a mode of --follow, try: ccprism view --follow --compact",
+      "--compact is a mode of --follow, try: ccplus view --follow --compact",
     );
     return 2;
   }
@@ -161,12 +155,12 @@ export async function runView(
     return await runCompact(file.filePath, options);
   }
 
-  if (flags.exportAs !== undefined) {
+  if (flags.exportAs) {
     if (flags.follow) {
       console.error("--export writes a finished session, so it cannot follow");
       return 2;
     }
-    return await runExport(flags, flags.exportAs, file, session);
+    return await runExport(flags, file, session);
   }
 
   if (flags.json) {

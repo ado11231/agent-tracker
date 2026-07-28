@@ -80,7 +80,7 @@ function summary(extra: Partial<SessionSummary> = {}): SessionSummary {
 
 // Two fixtures under a projects-root layout, basic the newer one.
 async function makeRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "ccprism-status-"));
+  const root = await mkdtemp(join(tmpdir(), "ccplus-status-"));
   const project = join(root, "-scrubbed-project");
   await mkdir(project);
   const newer = join(project, "11111111-aaaa-bbbb-cccc-000000000001.jsonl");
@@ -580,7 +580,7 @@ describe("runStatusline", () => {
   });
 
   it("errors and exits 2 when run by hand with no sessions", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ccprism-status-empty-"));
+    const root = await mkdtemp(join(tmpdir(), "ccplus-status-empty-"));
     const code = await runStatusline(flags({ root }), { stdin: undefined });
     expect(code).toBe(2);
     expect(errorSpy).toHaveBeenCalled();

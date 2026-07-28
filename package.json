@@ -1,16 +1,31 @@
 {
-  "name": "ccprism",
-  "version": "0.0.1",
+  "name": "ccplus",
+  "version": "0.1.0",
   "description": "Token metrics and readable transcripts for Claude Code sessions",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "cli",
+    "tokens",
+    "cost",
+    "usage",
+    "transcript",
+    "observability",
+    "statusline"
+  ],
   "type": "module",
   "license": "MIT",
   "author": "Adnan Alagic",
+  "homepage": "https://github.com/ado11231/ccplus#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ado11231/ccprism.git"
+    "url": "git+https://github.com/ado11231/ccplus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ado11231/ccplus/issues"
   },
   "bin": {
-    "ccprism": "dist/main.js"
+    "ccplus": "dist/main.js"
   },
   "files": [
     "dist"
@@ -22,7 +37,8 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "commander": "^14.0.0",

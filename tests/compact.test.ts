@@ -52,7 +52,7 @@ function flags(root: string, extra: Partial<ViewFlags> = {}): ViewFlags {
     ascii: false,
     follow: true,
     compact: true,
-    exportAs: undefined,
+    exportAs: false,
     out: undefined,
     ...extra,
   };
@@ -61,7 +61,7 @@ function flags(root: string, extra: Partial<ViewFlags> = {}): ViewFlags {
 const CLOCK = () => new Date("2026-07-20T19:53:02");
 
 async function makeRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "ccprism-compact-"));
+  const root = await mkdtemp(join(tmpdir(), "ccplus-compact-"));
   const project = join(root, "-scrubbed-project");
   await mkdir(project);
   const older = join(project, "22222222-aaaa-bbbb-cccc-000000000002.jsonl");
@@ -114,7 +114,7 @@ describe("cost delta", () => {
   const SESSION = "13af1923-3b85-44dc-9715-0af802703bd6";
 
   async function growingRoot(): Promise<{ root: string; file: string }> {
-    const root = await mkdtemp(join(tmpdir(), "ccprism-delta-"));
+    const root = await mkdtemp(join(tmpdir(), "ccplus-delta-"));
     const project = join(root, "-scrubbed-project");
     await mkdir(project);
     const file = join(project, `${SESSION}.jsonl`);
@@ -264,7 +264,7 @@ describe("compact follow (once)", () => {
   });
 
   it("exits 2 on an empty root", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ccprism-compact-empty-"));
+    const root = await mkdtemp(join(tmpdir(), "ccplus-compact-empty-"));
     const code = await runView(flags(root), { once: true });
     expect(code).toBe(2);
     expect(errored()).toContain("no sessions found");
@@ -286,7 +286,7 @@ describe("compact follow (streaming loop)", () => {
   }
 
   it("appends a new line when the watched file changes, then stops on signal", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ccprism-compact-live-"));
+    const root = await mkdtemp(join(tmpdir(), "ccplus-compact-live-"));
     const project = join(root, "-scrubbed-project");
     await mkdir(project);
     const file = join(project, "11111111-aaaa-bbbb-cccc-000000000001.jsonl");

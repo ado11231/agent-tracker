@@ -13,7 +13,7 @@ import { defaultProjectsRoot } from "../parser/discover.js";
 import { newestSessionPath, type CommandFlags } from "./load.js";
 
 // One readable line for Claude Code's custom statusLine command:
-// ccprism's own cost, the live context fill, and turns for the active
+// ccplus's own cost, the live context fill, and turns for the active
 // session. Claude Code pipes session JSON on stdin (see the schema at
 // code.claude.com/docs/en/statusline); the key field is
 // transcript_path, which names the exact session file so we never

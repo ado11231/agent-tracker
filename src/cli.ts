@@ -1,22 +1,10 @@
 import { Command, Option } from "commander";
 import { version } from "../package.json";
-import {
-  runDashboard,
-  HEATMAP_CATEGORIES,
-  type HeatmapCategory,
-} from "./commands/dashboard.js";
+import { runDashboard } from "./commands/dashboard.js";
 import { runDoctor } from "./commands/doctor.js";
-import {
-  runSessions,
-  SESSION_SORTS,
-  type SessionSort,
-} from "./commands/sessions.js";
+import { runSessions } from "./commands/sessions.js";
 import { runStatusline } from "./commands/statusline.js";
-import {
-  runView,
-  EXPORT_FORMATS,
-  type ExportFormat,
-} from "./commands/view.js";
+import { runView } from "./commands/view.js";
 import type { CommandFlags } from "./commands/load.js";
 
 // Help group headings. Live commands run beside a session in
@@ -33,17 +21,15 @@ interface RawOpts {
   since?: string;
   until?: string;
   limit?: string;
-  sort?: SessionSort;
   model?: string;
   grep?: string;
   full?: boolean;
   costs?: boolean;
   follow?: boolean;
   compact?: boolean;
-  export?: ExportFormat;
+  export?: boolean;
   output?: string;
   year?: boolean;
-  by?: HeatmapCategory;
   month?: boolean;
 }
 
@@ -73,7 +59,7 @@ export function buildProgram(): Command {
   const program = new Command();
 
   program
-    .name("ccprism")
+    .name("ccplus")
     .description(
       "Token metrics and readable transcripts for Claude Code sessions",
     )
@@ -103,11 +89,6 @@ export function buildProgram(): Command {
     .helpGroup(REPORTS)
     .description("List recent sessions with cost, duration, turns, and model")
     .option("--limit <n>", "rows to show, 0 for all", "20")
-    .addOption(
-      new Option("--sort <field>", "order the rows, biggest first")
-        .choices([...SESSION_SORTS])
-        .default("time"),
-    )
     .option("--model <text>", "only sessions that used a matching model")
     .option("--grep <text>", "only sessions with a prompt containing this text")
     .action(async (_opts: RawOpts, command: Command) => {
@@ -121,7 +102,6 @@ export function buildProgram(): Command {
       process.exitCode = await runSessions({
         ...toFlags(opts),
         limit,
-        sort: opts.sort ?? "time",
         model: opts.model,
         grep: opts.grep,
       });
@@ -139,22 +119,18 @@ export function buildProgram(): Command {
     .option("--costs", "per call cost badges on tool lines")
     .option("-f, --follow", "keep appending turns as the session grows")
     .option("--compact", "with --follow, a cost log instead of the transcript")
-    .addOption(
-      new Option("--export <format>", "write the transcript to a file").choices([
-        ...EXPORT_FORMATS,
-      ]),
-    )
-    .option("-o, --output <path>", "where --export writes, default ./<id>.<format>")
+    .option("--export", "write the transcript to a markdown file")
+    .option("-o, --output <path>", "where --export writes, default ./<id>.md")
     .action(async (id: string | undefined, _opts: RawOpts, command: Command) => {
       const opts = command.optsWithGlobals() as RawOpts;
-      const exportAs = opts.export;
+      const exportAs = opts.export === true;
       process.exitCode = await runView({
         ...toFlags(opts),
         id,
         // An export is meant to be read on its own later, with nobody
         // around to rerun it with --full, so it expands unless asked
         // not to.
-        full: opts.full ?? exportAs !== undefined,
+        full: opts.full ?? exportAs,
         costs: opts.costs === true,
         ascii: opts.ascii === true,
         follow: opts.follow === true,
@@ -173,48 +149,17 @@ export function buildProgram(): Command {
       );
     });
 
-  // watch became a mode of view. It is kept as a hidden forwarder so
-  // muscle memory and any scripts still work, and it says once on
-  // stderr what to type instead. Registered last and hidden, so it is
-  // out of --help and out of the way of the group ordering above.
-  const watch = withGlobalFlags(new Command("watch"))
-    .description("deprecated, now view --follow --compact")
-    .argument("[id]", "session id, unambiguous prefixes accepted")
-    .action(async (id: string | undefined, _opts: RawOpts, command: Command) => {
-      console.error("ccprism watch is now ccprism view --follow --compact");
-      const opts = command.optsWithGlobals() as RawOpts;
-      process.exitCode = await runView({
-        ...toFlags(opts),
-        id,
-        full: false,
-        costs: false,
-        ascii: opts.ascii === true,
-        follow: true,
-        compact: true,
-        exportAs: undefined,
-        out: undefined,
-      });
-    });
-  program.addCommand(watch, { hidden: true });
-
-  // Running ccprism with no command shows the dashboard. --year adds
+  // Running ccplus with no command shows the dashboard. --year adds
   // the activity heatmap of daily cost, --month widens the summary
   // rows; both live on the root program because the bare dashboard is
   // not a subcommand of its own.
   withGlobalFlags(program)
-    .option("--year", "activity heatmap of daily cost over the past year")
-    .addOption(
-      new Option(
-        "--by <field>",
-        "color the --year heatmap by the day's top spender",
-      ).choices([...HEATMAP_CATEGORIES]),
-    )
+    .option("--year", "activity heatmap of daily cost, colored by model")
     .option("--month", "widen the summary rows from today/week to week/month")
     .action(async (opts: RawOpts) => {
       process.exitCode = await runDashboard({
         ...toFlags(opts),
         year: opts.year === true,
-        by: opts.by,
         month: opts.month === true,
         ascii: opts.ascii === true,
       });
@@ -228,9 +173,8 @@ export function buildProgram(): Command {
       "",
       "Run with no command for the dashboard: today and this week, and",
       "totals by project and model. Add --year for a contribution graph",
-      "of daily cost (--by model or --by project colors each day by its",
-      "top spender), or --month to widen the summary rows to week and",
-      "month.",
+      "of daily cost, each day colored by the model that spent the most",
+      "on it, or --month to widen the summary rows to week and month.",
       "",
       "view --follow is the live form of view. It renders the session so",
       "far, then appends turns as they arrive. Add --compact for a cost",

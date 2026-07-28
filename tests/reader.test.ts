@@ -114,7 +114,7 @@ describe("classifyLines", () => {
 
 describe("readSessionFile", () => {
   it("reads a jsonl file from disk", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "ccprism-test-"));
+    const dir = await mkdtemp(join(tmpdir(), "ccplus-test-"));
     const path = join(dir, "session.jsonl");
     const content = [
       line({ type: "user", uuid: "u1", parentUuid: null }),

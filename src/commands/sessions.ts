@@ -20,15 +20,9 @@ import {
   type TimeWindow,
 } from "./load.js";
 
-export const SESSION_SORTS = ["time", "cost", "duration", "turns"] as const;
-export type SessionSort = (typeof SESSION_SORTS)[number];
-
 export interface SessionsFlags extends CommandFlags {
   // Rows to show, 0 means all.
   limit: number;
-  // Every sort runs biggest first, since the reason to sort by a
-  // number is to see the top of it. time means newest first.
-  sort: SessionSort;
   // Keeps sessions that used a model whose id contains this text.
   model: string | undefined;
   // Keeps sessions where a prompt contains this text, and shows the
@@ -73,20 +67,11 @@ function promptMatch(
   return undefined;
 }
 
-function sortValue(row: Row, sort: SessionSort): number {
-  const summary = row.session.summary;
-  switch (sort) {
-    case "cost":
-      return row.rollup.usd;
-    case "duration":
-      return summary.durationMs ?? 0;
-    case "turns":
-      return summary.turns;
-    default: {
-      const time = new Date(summary.lastTimestamp ?? 0).getTime();
-      return Number.isNaN(time) ? 0 : time;
-    }
-  }
+// Newest first. The reason to list sessions is to find a recent one,
+// and the short id in the first column is what view takes from here.
+function lastActivity(row: Row): number {
+  const time = new Date(row.session.summary.lastTimestamp ?? 0).getTime();
+  return Number.isNaN(time) ? 0 : time;
 }
 
 export async function runSessions(flags: SessionsFlags): Promise<number> {
@@ -135,7 +120,7 @@ export async function runSessions(flags: SessionsFlags): Promise<number> {
     return 2;
   }
 
-  rows.sort((a, b) => sortValue(b, flags.sort) - sortValue(a, flags.sort));
+  rows.sort((a, b) => lastActivity(b) - lastActivity(a));
   const limited = flags.limit > 0 ? rows.slice(0, flags.limit) : rows;
 
   if (flags.json) {

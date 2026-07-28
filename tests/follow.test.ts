@@ -229,7 +229,7 @@ describe("renderFollowBody", () => {
 // the transcript reads as an append log.
 describe("append only property", () => {
   it("grows monotonically across a real session, rewriting rarely", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ccprism-follow-grow-"));
+    const root = await mkdtemp(join(tmpdir(), "ccplus-follow-grow-"));
     const file = join(root, "grow.jsonl");
     const all = (await readFile(COMPACT, "utf8")).split("\n").filter((l) => l !== "");
     const view = ctx();
@@ -277,14 +277,14 @@ function flags(root: string, extra: Partial<ViewFlags> = {}): ViewFlags {
     ascii: false,
     follow: true,
     compact: false,
-    exportAs: undefined,
+    exportAs: false,
     out: undefined,
     ...extra,
   };
 }
 
 async function growingRoot(lines: number): Promise<{ root: string; file: string; all: string[] }> {
-  const root = await mkdtemp(join(tmpdir(), "ccprism-follow-"));
+  const root = await mkdtemp(join(tmpdir(), "ccplus-follow-"));
   const project = join(root, "-scrubbed-project");
   await mkdir(project);
   const file = join(project, "11111111-aaaa-bbbb-cccc-000000000001.jsonl");

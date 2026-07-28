@@ -38,18 +38,12 @@ import {
   type TimeWindow,
 } from "./load.js";
 
-// What the --year grid can be colored by, beyond the default cost
-// magnitude: the model or the project that dominated each day.
-export const HEATMAP_CATEGORIES = ["model", "project"] as const;
-export type HeatmapCategory = (typeof HEATMAP_CATEGORIES)[number];
-
 // The dashboard takes flags beyond the shared set: --year draws the
-// activity heatmap, --by colors it by a category, --month widens the
-// summary rows, and --ascii swaps the heatmap glyph ramp. All optional
-// so callers holding a plain CommandFlags still fit.
+// activity heatmap, --month widens the summary rows, and --ascii swaps
+// the heatmap glyph ramp. All optional so callers holding a plain
+// CommandFlags still fit.
 export type DashboardFlags = CommandFlags & {
   year?: boolean;
-  by?: HeatmapCategory;
   month?: boolean;
   ascii?: boolean;
 };
@@ -60,12 +54,11 @@ interface ProjectRow {
   rollup: UsageRollup;
 }
 
-// The dominant category per day, plus the categories ranked biggest
-// first. Kept color-free here so it can go straight into --json; the
-// hue is assigned later, only for the terminal render.
-interface DayCategories {
-  label: HeatmapCategory;
-  dayCategory: Map<string, string>;
+// The model that spent the most on each day, plus the models ranked
+// biggest first. Kept color-free here so it can go straight into
+// --json; the hue is assigned later, only for the terminal render.
+interface DayModels {
+  dayModel: Map<string, string>;
   order: string[];
 }
 
@@ -75,11 +68,11 @@ interface Heatmap {
   weeks: number;
   daily: Map<string, number>;
   stats: ActivityStats;
-  category?: DayCategories;
+  models: DayModels;
 }
 
-// Reduces per-message spend into the single category that spent the
-// most on each day, and the overall ranking used for the legend.
+// Reduces per-message spend into the single model that spent the most
+// on each day, and the overall ranking used for the legend.
 function dominantByDay(
   rows: Iterable<{ day: string | undefined; category: string; usd: number }>,
 ): { dayCategory: Map<string, string>; order: string[] } {
@@ -113,19 +106,18 @@ function dominantByDay(
   return { dayCategory, order };
 }
 
-// Distinct 16-color hues for categories, ranked spender first. Red is
-// left out: it means an error elsewhere in the tool. Cycles if there
-// are somehow more categories than hues.
-function buildColoring(category: DayCategories, c: Style): HeatmapColoring {
+// Distinct 16-color hues for models, ranked spender first. Red is left
+// out: it means an error elsewhere in the tool. Cycles if there are
+// somehow more models than hues.
+function buildColoring(models: DayModels, c: Style): HeatmapColoring {
   const palette = [c.cyan, c.magenta, c.yellow, c.blue, c.green];
   const colorMap = new Map<string, (text: string) => string>();
-  category.order.forEach((name, i) => {
+  models.order.forEach((name, i) => {
     colorMap.set(name, palette[i % palette.length] ?? c.green);
   });
   return {
-    label: category.label,
-    dayCategory: category.dayCategory,
-    order: category.order,
+    dayCategory: models.dayModel,
+    order: models.order,
     colorOf: (name) => colorMap.get(name) ?? c.green,
   };
 }
@@ -218,8 +210,7 @@ export async function runDashboard(flags: DashboardFlags): Promise<number> {
     : sessions.length;
 
   let heatmap: Heatmap | undefined;
-  // --by asks to color the grid, so it implies --year.
-  if (flags.year === true || flags.by !== undefined) {
+  if (flags.year === true) {
     const daily = new Map<string, number>();
     for (const [key, rollup] of rollupByKey(allUsage, (u) => dayOf(u.timestamp))) {
       daily.set(key, rollup.usd);
@@ -227,34 +218,18 @@ export async function runDashboard(flags: DashboardFlags): Promise<number> {
     const width = process.stdout.columns ?? 80;
     const { from, weeks } = heatmapRange(now, width);
 
-    // --by colors each day by whichever model or project spent the
-    // most that day. Model rides straight on each usage entry; project
-    // has to be joined back through the session it came from.
-    let category: DayCategories | undefined;
-    if (flags.by === "model") {
-      const { dayCategory, order } = dominantByDay(
-        allUsage
-          .filter((u) => u.model !== SYNTHETIC_MODEL)
-          .map((u) => ({
-            day: dayOf(u.timestamp),
-            category: shortModel(u.model),
-            usd: costOfUsage(u.usage, u.model) ?? 0,
-          })),
-      );
-      category = { label: "model", dayCategory, order };
-    } else if (flags.by === "project") {
-      const { dayCategory, order } = dominantByDay(
-        windowed.flatMap(({ session, usage }) => {
-          const project = projectLabel(session.summary);
-          return usage.map((u) => ({
-            day: dayOf(u.timestamp),
-            category: project,
-            usd: costOfUsage(u.usage, u.model) ?? 0,
-          }));
-        }),
-      );
-      category = { label: "project", dayCategory, order };
-    }
+    // Each day is tinted by whichever model spent the most on it,
+    // which rides straight on the usage entries. The glyph still
+    // carries the magnitude, so the grid answers both questions.
+    const { dayCategory, order } = dominantByDay(
+      allUsage
+        .filter((u) => u.model !== SYNTHETIC_MODEL)
+        .map((u) => ({
+          day: dayOf(u.timestamp),
+          category: shortModel(u.model),
+          usd: costOfUsage(u.usage, u.model) ?? 0,
+        })),
+    );
 
     heatmap = {
       from,
@@ -262,7 +237,7 @@ export async function runDashboard(flags: DashboardFlags): Promise<number> {
       weeks,
       daily,
       stats: activityStats(daily, from, now),
-      category,
+      models: { dayModel: dayCategory, order },
     };
   }
 
@@ -295,20 +270,15 @@ export async function runDashboard(flags: DashboardFlags): Promise<number> {
             ? {
                 activity: {
                   since: heatmap.from.toISOString(),
-                  by: heatmap.category?.label ?? null,
                   ...heatmap.stats,
                 },
                 byDay: [...heatmap.daily.entries()]
                   .sort((a, b) => a[0].localeCompare(b[0]))
-                  .map(([date, usd]) =>
-                    heatmap.category === undefined
-                      ? { date, usd }
-                      : {
-                          date,
-                          usd,
-                          category: heatmap.category.dayCategory.get(date) ?? null,
-                        },
-                  ),
+                  .map(([date, usd]) => ({
+                    date,
+                    usd,
+                    model: heatmap.models.dayModel.get(date) ?? null,
+                  })),
               }
             : {}),
         },
@@ -362,7 +332,7 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
   const dot = c.dim("·");
 
   lines.push(
-    `${c.bold("ccprism")} ${dot} ${sessionCount} sessions ${dot} ` +
+    `${c.bold("ccplus")} ${dot} ${sessionCount} sessions ${dot} ` +
       `${c.bold(fmtUsd(total.usd))} ${dot} cache hit ${fmtPercent(cacheHitRatio(total))}`,
   );
   lines.push("");
@@ -377,10 +347,7 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
       glyphs: glyphsFor(flags.ascii === true),
       style: c,
       width: process.stdout.columns ?? 80,
-      coloring:
-        heatmap.category === undefined
-          ? undefined
-          : buildColoring(heatmap.category, c),
+      coloring: buildColoring(heatmap.models, c),
     });
     for (const line of rendered) lines.push(line);
     lines.push("");
@@ -409,30 +376,34 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
   }
   if (subagents.messages > 0 || retries.messages > 0) {
     lines.push(
-      c.dim(
-        `  of the total: subagents ${fmtUsd(subagents.usd)} (${subagents.messages} msgs)` +
-          ` · retries ${fmtUsd(retries.usd)} (${retries.messages} msgs)`,
-      ),
+      `  ${c.cyan("of the total:")} subagents ${fmtUsd(subagents.usd)}` +
+        ` (${subagents.messages} msgs) · retries ${fmtUsd(retries.usd)}` +
+        ` (${retries.messages} msgs)`,
     );
   }
   lines.push("");
+
+  // Each table gets its own heading hue so the eye can jump straight to
+  // a section. The heading is the only colored text in a table, which
+  // leaves the numbers plain and readable, and the layout survives
+  // color being stripped because the columns are already aligned.
+  const heading = (table: string[], paint: (text: string) => string): void => {
+    lines.push(`  ${c.bold(paint(table[0] ?? ""))}`);
+    for (const line of table.slice(1)) lines.push(`  ${line}`);
+  };
 
   const projectRows: string[][] = [["project", "sessions", "cost"]];
   for (const p of projects) {
     projectRows.push([p.name, String(p.sessions), fmtUsd(p.rollup.usd)]);
   }
-  const projectTable = renderTable(projectRows, ["left", "right", "right"]);
-  lines.push(`  ${c.dim(projectTable[0] ?? "")}`);
-  for (const line of projectTable.slice(1)) lines.push(`  ${line}`);
+  heading(renderTable(projectRows, ["left", "right", "right"]), c.cyan);
   lines.push("");
 
   const modelRows: string[][] = [["model", "messages", "cost"]];
   for (const [model, rollup] of models) {
     modelRows.push([shortModel(model), String(rollup.messages), fmtUsd(rollup.usd)]);
   }
-  const modelTable = renderTable(modelRows, ["left", "right", "right"]);
-  lines.push(`  ${c.dim(modelTable[0] ?? "")}`);
-  for (const line of modelTable.slice(1)) lines.push(`  ${line}`);
+  heading(renderTable(modelRows, ["left", "right", "right"]), c.magenta);
   lines.push("");
 
   const toolTableRows: string[][] = [["tool", "calls", "fails", "cost"]];
@@ -444,16 +415,16 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
       fmtUsd(stats.usd),
     ]);
   }
-  const toolTable = renderTable(toolTableRows, ["left", "right", "right", "right"]);
-  lines.push(`  ${c.dim(toolTable[0] ?? "")}`);
-  for (const line of toolTable.slice(1)) lines.push(`  ${line}`);
+  heading(
+    renderTable(toolTableRows, ["left", "right", "right", "right"]),
+    c.yellow,
+  );
 
   if (total.unknownModels.length > 0) {
     lines.push("");
     lines.push(
-      c.dim(
-        `  some usage has no pricing (${total.unknownModels.join(", ")}), see ccprism doctor`,
-      ),
+      `  ${c.yellow("no pricing")} for ${total.unknownModels.join(", ")}` +
+        `, see ccplus doctor`,
     );
   }
 

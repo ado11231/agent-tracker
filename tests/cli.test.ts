@@ -5,17 +5,10 @@ describe("cli scaffold", () => {
   it("registers the v1 commands", () => {
     const program = buildProgram();
     const names = program.commands.map((command) => command.name());
-    expect(names).toEqual([
-      "statusline",
-      "sessions",
-      "view",
-      "doctor",
-      // Hidden, kept only so the old name still works.
-      "watch",
-    ]);
+    expect(names).toEqual(["statusline", "sessions", "view", "doctor"]);
   });
 
-  it("keeps watch as a hidden alias, out of the help", () => {
+  it("names the live modes of view in the help", () => {
     const program = buildProgram();
     let help = "";
     program.configureOutput({
@@ -24,7 +17,6 @@ describe("cli scaffold", () => {
       },
     });
     program.outputHelp();
-    expect(help).not.toContain("watch");
     expect(help).toContain("--compact");
   });
 
@@ -65,8 +57,8 @@ describe("cli scaffold", () => {
     expect(help).toContain("view --follow");
   });
 
-  it("is named ccprism", () => {
-    expect(buildProgram().name()).toBe("ccprism");
+  it("is named ccplus", () => {
+    expect(buildProgram().name()).toBe("ccplus");
   });
 });
 
@@ -91,7 +83,7 @@ describe("option routing", () => {
       seen = command.optsWithGlobals();
     });
     await program.parseAsync([
-      "node", "ccprism", "sessions", "--json", "--limit", "3", "--since", "2026-01-01",
+      "node", "ccplus", "sessions", "--json", "--limit", "3", "--since", "2026-01-01",
     ]);
     expect(seen).toMatchObject({ json: true, limit: "3", since: "2026-01-01" });
   });
