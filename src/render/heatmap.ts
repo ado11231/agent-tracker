@@ -11,20 +11,27 @@ import type { Style } from "./style.js";
 
 // "  Mon " — two lead spaces, a three-wide weekday label, one space.
 const GUTTER = 6;
-// The two vertical border columns, one each side of the grid.
-const BORDER = 2;
+// The two vertical frame columns, one each side of the grid.
+const FRAME = 2;
+// One space inside the left frame column so the first cell of a row
+// does not touch it. The right side gets the same from the trailing
+// gap every cell carries.
+const LEAD_PAD = 1;
+// Everything a row spends on something other than cells.
+const OVERHEAD = GUTTER + FRAME + LEAD_PAD;
 const MAX_WEEKS = 53;
-// Characters per week column: one for the glyph, the rest a gap. A
-// short history stretches its columns apart so the grid reads as a
-// grid instead of a solid strip; a full year falls back toward 1 so it
-// still fits the width. Never wider than this many columns per week.
+// Characters per week column: one for the glyph, the rest a gap. Never
+// less than two, so cells always stand apart instead of fusing into a
+// solid strip, and never more than three, past which the grid reads as
+// scattered dots. A narrow terminal drops old weeks rather than
+// closing the gaps.
+const MIN_CELL = 2;
 const MAX_CELL = 3;
 
 // Width in characters of each week column, given the room available.
-// Always at least 1, and never so wide that the weeks overflow.
 function cellWidth(weeks: number, budget: number): number {
-  if (weeks <= 0) return 1;
-  return Math.max(1, Math.min(MAX_CELL, Math.floor(budget / weeks)));
+  if (weeks <= 0) return MIN_CELL;
+  return Math.max(MIN_CELL, Math.min(MAX_CELL, Math.floor(budget / weeks)));
 }
 
 const MONTHS = [
@@ -59,8 +66,11 @@ export function heatmapRange(
   to: Date,
   width: number,
 ): { from: Date; weeks: number } {
-  const budget = width - GUTTER - BORDER;
-  const weeks = Math.max(MIN_WEEKS, Math.min(MAX_WEEKS, budget));
+  const budget = width - OVERHEAD;
+  const weeks = Math.max(
+    MIN_WEEKS,
+    Math.min(MAX_WEEKS, Math.floor(budget / MIN_CELL)),
+  );
   const from = new Date(sundayOf(to));
   from.setDate(from.getDate() - (weeks - 1) * 7);
   return { from, weeks };
@@ -154,9 +164,10 @@ export function renderHeatmap(input: HeatmapInput): string[] {
   const toTime = new Date(to);
   toTime.setHours(23, 59, 59, 999);
 
-  const budget = (input.width ?? 80) - GUTTER - BORDER;
+  const budget = (input.width ?? 80) - OVERHEAD;
   const cell = cellWidth(weeks, budget);
   const gap = " ".repeat(cell - 1);
+  const pad = " ".repeat(LEAD_PAD);
 
   // Values of the days actually on screen, so the scale is not skewed
   // by history scrolled off the left.
@@ -172,15 +183,18 @@ export function renderHeatmap(input: HeatmapInput): string[] {
 
   const lines: string[] = [];
   lines.push(`  ${style.bold(`daily cost · last ${weeks} weeks · by model`)}`);
-  // The month labels sit above the grid interior, one column past the
-  // left border.
-  lines.push(monthHeader(from, weeks, cell, GUTTER + BORDER / 2, style));
+  // The month labels sit above the first cell of each week, so they
+  // clear the left frame column and its padding.
+  lines.push(monthHeader(from, weeks, cell, GUTTER + 1 + LEAD_PAD, style));
 
   const box = glyphs.box;
-  const interior = weeks * cell;
+  const interior = LEAD_PAD + weeks * cell;
   const rule = box.h.repeat(interior);
   const framePad = " ".repeat(GUTTER);
-  lines.push(framePad + style.dim(box.tl + rule + box.tr));
+  // The frame is drawn plain, not dim. It is the one piece of chrome
+  // that has to hold a shape against a grid of block glyphs, and dim
+  // left it barely visible on most themes.
+  lines.push(framePad + box.tl + rule + box.tr);
 
   for (let r = 0; r < 7; r++) {
     const label = (ROW_LABELS[r] ?? "").padEnd(3);
@@ -205,12 +219,13 @@ export function renderHeatmap(input: HeatmapInput): string[] {
       // each cell the same width so the border lines up.
       cells += gap;
     }
-    // Weekday label in the gutter, then the row framed by the border.
-    // Only the frame dims: it is chrome, and the labels are text.
-    lines.push(`  ${label} ${style.dim(box.v)}${cells}${style.dim(box.v)}`);
+    // Weekday label in the gutter, then the row inside the frame. The
+    // lead pad keeps the first cell off the frame; the last cell's own
+    // trailing gap does the same on the right.
+    lines.push(`  ${label} ${box.v}${pad}${cells}${box.v}`);
   }
 
-  lines.push(framePad + style.dim(box.bl + rule + box.br));
+  lines.push(framePad + box.bl + rule + box.br);
   lines.push("");
 
   const when =

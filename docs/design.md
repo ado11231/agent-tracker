@@ -165,7 +165,7 @@ Requirements:
 | User message | **bold + cyan**, `●` gutter, dim timestamp right of marker. Loudest thing on screen — these are the scan anchors. |
 | Claude prose | **unstyled default.** Body text is the baseline everything else is relative to. |
 | Thinking | dim + italic, collapsed to a `⋮ thinking (N lines)` label (the glyph already signals hidden content); full text only with `--full` |
-| Tool call | colored glyph per family (`⚡` bash, `✎` edit/write, `⌕` read/grep, `⛁` web), **description bold**, raw command dim on next line with `└` connector. Path labels truncate from the **front**, keeping the file name (`…/memory/phase-status.md`); prose/commands truncate from the end |
+| Tool call | glyph per family (`⚡` bash, `✎` edit/write, `⌕` read/grep, `⛁` web), colored for the three common ones only (see the color code below), **description bold**, raw command dim on next line with `└` connector. Path labels truncate from the **front**, keeping the file name (`…/memory/phase-status.md`); prose/commands truncate from the end |
 | Tool result | dim, truncated ~3 lines; **errors: red, fully expanded** |
 | Cost/meta | dim badges at turn boundaries (`· 1.8k out · $0.04`); inverse-video chips in session header |
 | Separation | blank line between turns; dim `─` rule at session boundaries only; 2-space hanging indent so wraps clear the gutter |
@@ -217,21 +217,15 @@ machinery to hide: every line is a number someone asked for. Dimming there
 just made the whole screen grey, which is what prompted this.
 
 **Dim is chrome only.** It survives on three things, none of which are text:
-the heatmap box border, the empty-day cells (they have to recede or the grid
-is noise), and the `·` separators in header lines. Anything that is a word
-carries a hue or weight instead.
+the heatmap's empty-day cells (they have to recede or the grid is noise), the
+`·` separators in header lines, and the `of the total:` label. Anything else
+that is a word carries a hue or weight instead.
 
-**A heading's hue names what is listed**, so the same colour means the same
-thing across commands:
-
-| Hue | Means | Where |
-| --- | --- | --- |
-| cyan | project | dashboard project table, `doctor` project slug, `of the total:` |
-| magenta | model | dashboard model table |
-| yellow | tool, and warnings | dashboard tool table, `doctor` issue marks, no-pricing note |
-| blue | session | `sessions` table heading |
-| green | healthy | `doctor` all clean |
-| red | reserved for errors | never used decoratively |
+The heatmap frame used to be dim too and is no longer (2026-07-31). It is the
+one piece of chrome that has to hold a shape against a grid of block glyphs,
+and dim left it barely visible on most themes. It draws plain and heavy
+(`┏━┓┃┗┛`), inheriting the terminal foreground so it reads dark on a light
+theme and light on a dark one.
 
 Headings are styled **after** `renderTable` has padded them, since padding
 counts `.length` and would otherwise measure the escape codes. That is also
@@ -242,6 +236,53 @@ Where a label introduces a value, the **value** takes the weight, not the
 label: the heatmap stat strip reads `most active` plain then the date bold.
 Dimming the label and leaving the value plain, which is what it used to do,
 put the emphasis on the wrong half.
+
+### The color code (2026-07-31, one scheme for every command)
+
+Every hue is assigned in `render/palette.ts` and nowhere else. Before this
+the scheme had drifted three ways: yellow meant both "tool" and "warning",
+`web` and `mcp` were both magenta, and models were colored by family on the
+statusline but by rank of spend on the heatmap, so the same model came out a
+different color on two surfaces and could change between two dashboard runs.
+
+**Two hues are reserved everywhere.** Nothing else may use them, so a red or
+a yellow anywhere in the output always means the same thing:
+
+| Hue | Means |
+| --- | --- |
+| red | it failed |
+| yellow | it wants your attention |
+
+**The other four name the thing being counted**, and only appear where that
+thing is the subject of the line:
+
+| Hue | Means | Where |
+| --- | --- | --- |
+| cyan | project | dashboard project table, `doctor` project slug |
+| blue | session | `sessions` table heading |
+| magenta | model | dashboard model table |
+| green | tool | dashboard tool table |
+
+Green does double duty as a healthy gauge on the statusline. That is the one
+reuse in the scheme and it is safe because the two never share a surface:
+gauges are live output, the tool hue is a report heading.
+
+**A model family keeps its hue on every surface** (`modelPaint`): opus
+magenta, sonnet blue, haiku green, fable cyan. Opus takes magenta, which is
+the model hue itself, since it is the common case.
+
+A legend showing several models at once (`assignModelPaints`) has the extra
+problem that two of a family, opus 4.8 beside opus 5, would come out
+identical. There the models are passed ranked by spend, the biggest spender
+keeps the family hue, and each one after it takes the first hue still free.
+So the dominant model still looks like itself and the legend stays readable.
+
+**The transcript has four hues and more than four things worth marking**, so
+they go to what a reader scans for (`toolPaint`): cyan for your own prompts,
+then green ran something, magenta changed a file, blue read one. Web, mcp and
+agent calls keep their glyph and take no hue, since they are rare and giving
+them one would cost cyan the single job it has there. Nothing in a transcript
+is yellow, so a red line still means a call failed.
 
 ## 5. CLI surface (v1 — frozen)
 
@@ -378,6 +419,8 @@ Color rules (this surface inverts two defaults on purpose):
   numbers and not a mirror.
 - Model is colored by family (opus magenta, sonnet blue, haiku green, fable
   cyan) so a model switch is visible at a glance. Cost is bold, turns plain.
+  The hue comes from `modelPaint`, the same one the heatmap legend uses, so a
+  model looks the same on both surfaces.
 
 A statusLine command must never break its host, so once Claude Code has
 invoked us every failure path prints best effort and exits 0. Note it runs in
@@ -499,6 +542,13 @@ rows, magnitude on the glyph ramp so it survives `NO_COLOR` and hue naming
 the model that spent the most that day, with a most-active/longest/current
 streak strip and two legends beneath. `--json` adds an `activity` object and
 a `byDay` series carrying each day's top `model`.
+
+The grid fits itself to the terminal. Every week column is at least 2 wide
+and at most 3, so cells always stand apart rather than fusing into a solid
+strip, plus 9 columns of gutter, frame and padding. A full 53 week year
+therefore needs 115 columns; narrower drops the oldest weeks from the left
+rather than closing the gaps or wrapping, and the caption says how many weeks
+survived.
 
 **Flag surface (2026-07-27):** 15 flags over 5 commands. Six are global
 (`--json`, `--no-color`, `--ascii`, `--project`, `--since`, `--until`); the

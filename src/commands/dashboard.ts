@@ -28,6 +28,7 @@ import {
   renderHeatmap,
   type HeatmapColoring,
 } from "../render/heatmap.js";
+import { assignModelPaints, roles } from "../render/palette.js";
 import { colorEnabled, makeStyle, type Style } from "../render/style.js";
 import {
   inWindow,
@@ -109,19 +110,15 @@ function dominantByDay(
   return { dayCategory, order };
 }
 
-// Distinct 16-color hues for models, ranked spender first. Red is left
-// out: it means an error elsewhere in the tool. Cycles if there are
-// somehow more models than hues.
+// Model hues come from the shared palette, so a model reads the same
+// here as it does on the statusline. Ranked spender first, which is
+// what decides who keeps the family hue when two of a family show up.
 function buildColoring(models: DayModels, c: Style): HeatmapColoring {
-  const palette = [c.cyan, c.magenta, c.yellow, c.blue, c.green];
-  const colorMap = new Map<string, (text: string) => string>();
-  models.order.forEach((name, i) => {
-    colorMap.set(name, palette[i % palette.length] ?? c.green);
-  });
+  const paints = assignModelPaints(c, models.order);
   return {
     dayCategory: models.dayModel,
     order: models.order,
-    colorOf: (name) => colorMap.get(name) ?? c.green,
+    colorOf: (name) => paints.get(name) ?? ((text) => text),
   };
 }
 
@@ -333,6 +330,7 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
   // grid above them.
   const wideRows = flags.span === "month" || flags.span === "year";
   const c = makeStyle(colorEnabled(flags.color));
+  const r = roles(c);
   const lines: string[] = [];
   const dot = c.dim("·");
 
@@ -381,17 +379,18 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
   }
   if (subagents.messages > 0 || retries.messages > 0) {
     lines.push(
-      `  ${c.cyan("of the total:")} subagents ${fmtUsd(subagents.usd)}` +
+      `  ${c.dim("of the total:")} subagents ${fmtUsd(subagents.usd)}` +
         ` (${subagents.messages} msgs) · retries ${fmtUsd(retries.usd)}` +
         ` (${retries.messages} msgs)`,
     );
   }
   lines.push("");
 
-  // Each table gets its own heading hue so the eye can jump straight to
-  // a section. The heading is the only colored text in a table, which
-  // leaves the numbers plain and readable, and the layout survives
-  // color being stripped because the columns are already aligned.
+  // Each table gets the hue of the thing it lists, so the eye can jump
+  // straight to a section and the same hue means the same thing in
+  // every other command. The heading is the only colored text in a
+  // table, which leaves the numbers plain and readable, and the layout
+  // survives color being stripped because the columns are aligned.
   const heading = (table: string[], paint: (text: string) => string): void => {
     lines.push(`  ${c.bold(paint(table[0] ?? ""))}`);
     for (const line of table.slice(1)) lines.push(`  ${line}`);
@@ -401,14 +400,14 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
   for (const p of projects) {
     projectRows.push([p.name, String(p.sessions), fmtUsd(p.rollup.usd)]);
   }
-  heading(renderTable(projectRows, ["left", "right", "right"]), c.cyan);
+  heading(renderTable(projectRows, ["left", "right", "right"]), r.project);
   lines.push("");
 
   const modelRows: string[][] = [["model", "messages", "cost"]];
   for (const [model, rollup] of models) {
     modelRows.push([shortModel(model), String(rollup.messages), fmtUsd(rollup.usd)]);
   }
-  heading(renderTable(modelRows, ["left", "right", "right"]), c.magenta);
+  heading(renderTable(modelRows, ["left", "right", "right"]), r.model);
   lines.push("");
 
   const toolTableRows: string[][] = [["tool", "calls", "fails", "cost"]];
@@ -422,13 +421,13 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
   }
   heading(
     renderTable(toolTableRows, ["left", "right", "right", "right"]),
-    c.yellow,
+    r.tool,
   );
 
   if (total.unknownModels.length > 0) {
     lines.push("");
     lines.push(
-      `  ${c.yellow("no pricing")} for ${total.unknownModels.join(", ")}` +
+      `  ${r.warn("no pricing")} for ${total.unknownModels.join(", ")}` +
         `, see ccplus doctor`,
     );
   }

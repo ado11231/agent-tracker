@@ -34,7 +34,7 @@ describe("heatThresholds and levelOf", () => {
 describe("heatmapRange", () => {
   it("caps at a year and starts on a Sunday", () => {
     const to = new Date("2026-07-25T12:00:00");
-    const wide = heatmapRange(to, 200);
+    const wide = heatmapRange(to, 250);
     expect(wide.weeks).toBe(53);
     expect(wide.from.getDay()).toBe(0);
     // The last column's Sunday is this week's Sunday, so the whole
@@ -46,8 +46,17 @@ describe("heatmapRange", () => {
 
   it("shrinks from the left on a narrow terminal", () => {
     const to = new Date("2026-07-25T12:00:00");
-    expect(heatmapRange(to, 30).weeks).toBe(22); // 30 - 6 gutter - 2 border
+    // 30 columns leaves 21 for cells after the 9 of gutter, frame and
+    // pad, and every cell is at least 2 wide.
+    expect(heatmapRange(to, 30).weeks).toBe(10);
     expect(heatmapRange(to, 8).weeks).toBe(4); // floored, never vanishes
+  });
+
+  it("needs the room for spaced cells before it draws a full year", () => {
+    const to = new Date("2026-07-25T12:00:00");
+    // 53 weeks at 2 columns each, plus the 9 of overhead.
+    expect(heatmapRange(to, 115).weeks).toBe(53);
+    expect(heatmapRange(to, 114).weeks).toBe(52);
   });
 });
 
@@ -142,9 +151,9 @@ describe("renderHeatmap", () => {
     expect(legend.indexOf("fable-5")).toBeLessThan(legend.indexOf("opus-4-8"));
   });
 
-  it("frames the grid with a border", () => {
+  it("frames the grid with a heavy border", () => {
     const text = render(false).join("\n");
-    for (const piece of ["┌", "┐", "└", "┘", "│"]) {
+    for (const piece of ["┏", "┓", "┗", "┛", "┃"]) {
       expect(text).toContain(piece);
     }
   });
@@ -153,7 +162,19 @@ describe("renderHeatmap", () => {
     const text = render(true).join("\n");
     expect(text).toContain("+");
     expect(text).toContain("|");
-    expect(text).not.toContain("│");
+    expect(text).not.toContain("┃");
+  });
+
+  it("keeps the cells off the frame and off each other", () => {
+    const rows = render(false).slice(3, 10);
+    for (const row of rows) {
+      // A cell never abuts the frame on either side.
+      expect(row).toMatch(/┃ /);
+      expect(row).toMatch(/ ┃$/);
+    }
+    // Two glyphs never end up adjacent, whatever the width.
+    const interior = (rows[4] ?? "").replace(/^.*┃/, "").replace(/┃$/, "");
+    expect(interior).not.toMatch(/[·░▒▓█]{2}/);
   });
 
   it("stretches the columns apart when the terminal is wide", () => {
@@ -161,9 +182,9 @@ describe("renderHeatmap", () => {
       daily, stats, from, to, weeks,
       glyphs: glyphsFor(false), style: plain, coloring,
     };
-    const gridRow = (ls: string[]) => ls.find((l) => l.includes("│"))?.length ?? 0;
+    const gridRow = (ls: string[]) => ls.find((l) => l.includes("┃"))?.length ?? 0;
     const narrow = renderHeatmap({ ...opts, width: 80 });
-    const wide = renderHeatmap({ ...opts, width: 200 });
+    const wide = renderHeatmap({ ...opts, width: 250 });
     // Same weeks, but wider cells, so the framed rows are longer.
     expect(gridRow(wide)).toBeGreaterThan(gridRow(narrow));
   });
@@ -185,11 +206,12 @@ describe("renderHeatmap", () => {
     // After the caption, month header, and top border, the seven
     // weekday rows run to the bottom border.
     const rows = render(false).slice(3, 10);
-    // Each row is framed, so strip the trailing border before looking
-    // at the final cell. Sunday (row 0) is `to` and renders a glyph;
-    // Monday (row 1) is tomorrow, so its last cell is a space.
-    const lastCell = (line?: string) => line?.replace(/│$/, "") ?? "";
-    expect(lastCell(rows[0]).endsWith(" ")).toBe(false);
-    expect(lastCell(rows[1]).endsWith(" ")).toBe(true);
+    // Every cell now carries a trailing gap, so a row cannot be
+    // checked by what it ends with. Where the last glyph sits is the
+    // real question: Sunday (row 0) is `to` and fills the final
+    // column, Monday (row 1) is tomorrow and stops a column short.
+    const lastGlyph = (line?: string) =>
+      (line ?? "").replace(/┃$/, "").search(/[·░▒▓█](?![\s\S]*[·░▒▓█])/);
+    expect(lastGlyph(rows[0])).toBeGreaterThan(lastGlyph(rows[1]));
   });
 });

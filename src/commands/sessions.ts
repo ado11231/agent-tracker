@@ -8,6 +8,7 @@ import {
   shortId,
   shortModel,
 } from "../render/format.js";
+import { roles } from "../render/palette.js";
 import { colorEnabled, makeStyle } from "../render/style.js";
 import { contentWidth, truncate } from "../render/text.js";
 import {
@@ -172,9 +173,9 @@ export async function runSessions(flags: SessionsFlags): Promise<number> {
   const rendered = renderTable(table, [
     "left", "left", "right", "right", "right", "left", "left",
   ]);
-  // Headings carry a hue naming what is listed, the same way the
+  // The heading carries the hue of the thing listed, the same way the
   // dashboard tables do. A session is the thing here, so blue.
-  const lines = [c.bold(c.blue(rendered[0] ?? ""))];
+  const lines = [c.bold(roles(c).session(rendered[0] ?? ""))];
   // A matched prompt goes under its own row, indented, so the table
   // still reads as a table and the snippet reads as evidence. The
   // indent does that work, not a dimmer grey.

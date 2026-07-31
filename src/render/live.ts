@@ -8,6 +8,7 @@ import type { ExtractedSession } from "../parser/events.js";
 import { emptyHostFacts, type HostFacts } from "../parser/host.js";
 import { fmtTokens, fmtUsd, shortModel } from "./format.js";
 import type { GlyphSet } from "./glyphs.js";
+import { modelPaint, roles, type Paint } from "./palette.js";
 import type { Style } from "./style.js";
 import { displayWidth } from "./text.js";
 
@@ -94,32 +95,24 @@ const GAUGE_DANGER = 0.8;
 const CACHE_POOR = 0.5;
 const CACHE_GOOD = 0.8;
 
-// One color per model family, so a switch is visible at a glance.
 // Dim is deliberately not used for any content on this panel: it
 // renders as low contrast gray and the statusline is small text on
 // someone else's background. Dim is kept for separators only, which
 // are structure and should recede.
-function modelColor(c: Style, model: string): (text: string) => string {
-  if (model.includes("opus")) return c.magenta;
-  if (model.includes("sonnet")) return c.blue;
-  if (model.includes("haiku")) return c.green;
-  if (model.includes("fable")) return c.cyan;
-  return (text) => text;
-}
-
-type Paint = (text: string) => string;
 
 // Fuller is worse: context filling toward compaction, quota burning
 // toward a cutoff.
 function fillPaint(c: Style, ratio: number): Paint {
-  return ratio >= GAUGE_DANGER ? c.red : ratio >= GAUGE_WARN ? c.yellow : c.green;
+  const r = roles(c);
+  return ratio >= GAUGE_DANGER ? r.danger : ratio >= GAUGE_WARN ? r.warn : r.ok;
 }
 
 // Emptier is worse. Kept separate from fillPaint rather than folded in
 // as an inverted flag, because the thresholds are genuinely different
 // numbers and not a mirror of each other.
 function cachePaint(c: Style, ratio: number): Paint {
-  return ratio >= CACHE_GOOD ? c.green : ratio >= CACHE_POOR ? c.yellow : c.red;
+  const r = roles(c);
+  return ratio >= CACHE_GOOD ? r.ok : ratio >= CACHE_POOR ? r.warn : r.danger;
 }
 
 function bar(ratio: number, g: GlyphSet): string {
@@ -200,7 +193,7 @@ function identityRow(
   return panelRow(
     [
       name === undefined ? undefined : c.bold(name),
-      model === undefined ? undefined : modelColor(c, model)(shortModel(model)),
+      model === undefined ? undefined : modelPaint(c, model)(shortModel(model)),
       host.effort,
       host.fastMode ? "fast" : undefined,
       `${summary.turns} ${summary.turns === 1 ? "turn" : "turns"}`,
@@ -218,6 +211,7 @@ function costRow(
   host: HostFacts,
 ): PanelRow {
   const { c, g } = options;
+  const r = roles(c);
   const known = summary.total.unknownModels.length === 0;
   const burn = known
     ? burnRatePerHour(summary.total.usd, summary.durationMs)
@@ -229,9 +223,9 @@ function costRow(
     [
       c.bold(known ? fmtUsd(summary.total.usd) : "$?"),
       burn === undefined ? undefined : `${fmtUsd(burn)}/hr`,
-      wasted > 0 ? c.yellow(`${fmtUsd(wasted)} wasted`) : undefined,
+      wasted > 0 ? r.warn(`${fmtUsd(wasted)} wasted`) : undefined,
       added > 0 || removed > 0
-        ? `${c.green(`+${added}`)} ${c.red(`${g.minus}${removed}`)}`
+        ? `${r.ok(`+${added}`)} ${r.danger(`${g.minus}${removed}`)}`
         : undefined,
     ],
     c.dim(`  ${g.dot}  `),

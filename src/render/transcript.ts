@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import type { SessionSummary } from "../cost/aggregate.js";
-import { toolCategory, type ToolCategory } from "../cost/tools.js";
+import { toolCategory } from "../cost/tools.js";
 import type { ToolCallEvent, UserEvent } from "../parser/events.js";
 import {
   fmtDuration,
@@ -11,6 +11,7 @@ import {
   shortModel,
 } from "./format.js";
 import type { GlyphSet } from "./glyphs.js";
+import { roles, toolPaint, userPaint } from "./palette.js";
 import type { Style } from "./style.js";
 import { displayWidth, truncate, truncatePath, wrapPlain } from "./text.js";
 import type {
@@ -66,25 +67,6 @@ function twoSided(
   if (plainRight === "") return styledLeft;
   const gap = width - displayWidth(plainLeft) - displayWidth(plainRight);
   return styledLeft + " ".repeat(Math.max(gap, 1)) + styledRight;
-}
-
-function toolColor(c: Style, category: ToolCategory): (text: string) => string {
-  switch (category) {
-    case "bash":
-      return c.yellow;
-    case "edit":
-      return c.green;
-    case "read":
-      return c.blue;
-    case "web":
-      return c.magenta;
-    case "agents":
-      return c.cyan;
-    case "mcp":
-      return c.magenta;
-    default:
-      return (text) => text;
-  }
 }
 
 function shortenPath(path: string, cwd: string | undefined): string {
@@ -248,19 +230,14 @@ function renderUserAnchor(
     }
     return;
   }
+  const you = userPaint(c);
   const plainLeft = `${base}${g.user} YOU`;
   const time = user.timestamp === undefined ? "" : fmtWhen(user.timestamp, ctx.now);
   out.push(
-    twoSided(
-      plainLeft,
-      c.bold(c.cyan(plainLeft)),
-      time,
-      c.dim(time),
-      ctx.width,
-    ),
+    twoSided(plainLeft, you(plainLeft), time, c.dim(time), ctx.width),
   );
   for (const line of wrapPlain(user.text, ctx.width - depth * 2 - 2)) {
-    out.push(c.bold(c.cyan(`${base}${INDENT}${line}`.trimEnd())));
+    out.push(you(`${base}${INDENT}${line}`.trimEnd()));
   }
 }
 
@@ -297,8 +274,9 @@ function renderResult(item: ToolItem, depth: number, ctx: RenderContext, out: st
   if (result.isError) {
     // Errors are the one thing always shown in full. Red, not dim,
     // because a failed call is what a reader scans for.
+    const danger = roles(c).danger;
     for (const line of lines) {
-      out.push(c.red(`${base}${line}`.trimEnd()));
+      out.push(danger(`${base}${line}`.trimEnd()));
     }
     return;
   }
@@ -325,7 +303,7 @@ function renderToolItem(item: ToolItem, depth: number, ctx: RenderContext, out: 
   const base = pad(depth);
   const category = toolCategory(item.call.toolName);
   const glyph = g.tools[category];
-  const color = toolColor(c, category);
+  const color = toolPaint(c, category);
   const available = ctx.width - depth * 2;
 
   const { label: rawLabel, suffix, isPath, detail } = toolLabel(item.call, ctx.cwd);

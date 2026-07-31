@@ -1,4 +1,5 @@
 import { shortId } from "../render/format.js";
+import { roles } from "../render/palette.js";
 import { colorEnabled, makeStyle } from "../render/style.js";
 import { loadSessions, type CommandFlags, type LoadedSession } from "./load.js";
 
@@ -90,6 +91,7 @@ export async function runDoctor(flags: CommandFlags): Promise<number> {
   }
 
   const c = makeStyle(colorEnabled(flags.color));
+  const r = roles(c);
   const lines: string[] = [];
   lines.push(
     `${c.bold("ccplus doctor")} ${c.dim("·")} ${sessions.length} sessions ` +
@@ -98,14 +100,14 @@ export async function runDoctor(flags: CommandFlags): Promise<number> {
   lines.push("");
 
   if (flagged.length === 0) {
-    lines.push(`  ${c.green("all clean")}, every line parsed and priced`);
+    lines.push(`  ${r.ok("all clean")}, every line parsed and priced`);
   } else {
     for (const session of flagged) {
-      // Cyan is the project hue everywhere else, so it reads as one
-      // scheme rather than as this command having its own.
-      lines.push(`  ${c.bold(shortId(session.sessionId))}  ${c.cyan(session.projectSlug)}`);
+      lines.push(
+        `  ${c.bold(shortId(session.sessionId))}  ${r.project(session.projectSlug)}`,
+      );
       for (const issue of session.issues) {
-        lines.push(`    ${c.yellow("!")} ${issue}`);
+        lines.push(`    ${r.warn("!")} ${issue}`);
       }
     }
   }
