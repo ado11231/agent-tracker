@@ -15,7 +15,8 @@ import {
   toolBreakdown,
   type ToolBreakdown,
 } from "../cost/tools.js";
-import { glyphsFor } from "../render/glyphs.js";
+import { glyphsFor, type GlyphSet } from "../render/glyphs.js";
+import { cachePaint } from "../render/live.js";
 import {
   fmtPercent,
   fmtTokens,
@@ -28,8 +29,20 @@ import {
   renderHeatmap,
   type HeatmapColoring,
 } from "../render/heatmap.js";
-import { assignModelPaints, roles } from "../render/palette.js";
-import { colorEnabled, makeStyle, type Style } from "../render/style.js";
+import {
+  assignModelPaints,
+  assignModelShades,
+  roles,
+  toolPaint,
+  type Paint,
+} from "../render/palette.js";
+import {
+  colorEnabled,
+  makeStyle,
+  supportsTruecolor,
+  type Style,
+} from "../render/style.js";
+import { displayWidth } from "../render/text.js";
 import {
   inWindow,
   loadSessions,
@@ -113,12 +126,21 @@ function dominantByDay(
 // Model hues come from the shared palette, so a model reads the same
 // here as it does on the statusline. Ranked spender first, which is
 // what decides who keeps the family hue when two of a family show up.
+// Each model brings a four step intensity ramp of its hue, which is
+// what lets one square stand for a day and still say how much it cost.
 function buildColoring(models: DayModels, c: Style): HeatmapColoring {
-  const paints = assignModelPaints(c, models.order);
+  // Truecolor buys a real ramp: without it the four steps have to come
+  // out of dim, normal, bright and bold, and the step most days land on
+  // is the dim one.
+  const shades = assignModelShades(c, models.order, supportsTruecolor());
   return {
     dayCategory: models.dayModel,
     order: models.order,
-    colorOf: (name) => paints.get(name) ?? ((text) => text),
+    colorOf: (name, level) => {
+      const ramp = shades.get(name);
+      if (ramp === undefined) return (text) => text;
+      return ramp[Math.min(3, Math.max(0, level - 1))] ?? ((text) => text);
+    },
   };
 }
 
@@ -324,6 +346,49 @@ interface DashboardData {
   heatmap: Heatmap | undefined;
 }
 
+// The share bar beside each row of the tables.
+const SHARE_WIDTH = 10;
+
+// A name with its number under it. The label reads first and plain, so
+// it takes the terminal's own foreground rather than a grey that fights
+// the theme; the number below carries the emphasis. Both are padded to
+// one width so several tiles line up as columns.
+interface Tile {
+  value: string;
+  label: string;
+  paint?: Paint;
+}
+
+function renderTiles(tiles: Tile[], c: Style): string[] {
+  const gap = "    ";
+  const widths = tiles.map((t) => Math.max(t.value.length, t.label.length));
+  // The last column keeps no trailing pad, so neither line ends in
+  // styled blanks.
+  const pad = (text: string, i: number): string => {
+    const padded = text.padEnd(widths[i] ?? 0);
+    return i === tiles.length - 1 ? padded.trimEnd() : padded;
+  };
+  const labels = tiles.map((t, i) => pad(t.label, i)).join(gap);
+  const values = tiles
+    .map((t, i) => {
+      const cell = c.bold(pad(t.value, i));
+      return t.paint === undefined ? cell : t.paint(cell);
+    })
+    .join(gap);
+  return [`  ${labels}`, `  ${values}`];
+}
+
+// A row's slice of the total, drawn as a small gauge so the table can
+// be read as a shape before any of its numbers are. Zero draws an
+// empty bar rather than nothing, keeping the column aligned.
+function shareCell(part: number, whole: number, g: GlyphSet): string {
+  const ratio = whole <= 0 ? 0 : Math.max(0, Math.min(1, part / whole));
+  const filled = ratio <= 0 ? 0 : Math.max(1, Math.round(ratio * SHARE_WIDTH));
+  const bar =
+    g.gaugeFull.repeat(filled) + g.gaugeEmpty.repeat(SHARE_WIDTH - filled);
+  return `${bar} ${`${Math.round(ratio * 100)}%`.padStart(4)}`;
+}
+
 function printDashboard(data: DashboardData, flags: DashboardFlags): void {
   const { sessionCount, total, today, week, month, subagents, retries, projects, models, toolRows, windowGiven, heatmap } = data;
   // month and year both widen the rows; year additionally draws the
@@ -331,12 +396,32 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
   const wideRows = flags.span === "month" || flags.span === "year";
   const c = makeStyle(colorEnabled(flags.color));
   const r = roles(c);
+  const g = glyphsFor(flags.ascii === true);
   const lines: string[] = [];
-  const dot = c.dim("·");
+  const columns = process.stdout.columns ?? 80;
 
+  // The masthead: the name, then the four numbers that answer "how
+  // much, over what" before any table is read. No rule under the name —
+  // a line that long is the widest thing on the screen and reads as a
+  // divider between two halves of a report rather than as a heading for
+  // the block below it. The blank line does that job.
+  lines.push(`  ${c.bold("ccplus")}`);
+  lines.push("");
+  const cache = cacheHitRatio(total);
   lines.push(
-    `${c.bold("ccplus")} ${dot} ${sessionCount} sessions ${dot} ` +
-      `${c.bold(fmtUsd(total.usd))} ${dot} cache hit ${fmtPercent(cacheHitRatio(total))}`,
+    ...renderTiles(
+      [
+        { value: fmtUsd(total.usd), label: windowGiven ? "in window" : "all time" },
+        { value: String(sessionCount), label: "sessions" },
+        { value: fmtTokens(total.messages), label: "messages" },
+        {
+          value: fmtPercent(cache),
+          label: "cache hit",
+          paint: cachePaint(c, cache),
+        },
+      ],
+      c,
+    ),
   );
   lines.push("");
 
@@ -347,81 +432,131 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
       from: heatmap.from,
       to: heatmap.to,
       weeks: heatmap.weeks,
-      glyphs: glyphsFor(flags.ascii === true),
+      glyphs: g,
       style: c,
-      width: process.stdout.columns ?? 80,
+      width: columns,
       coloring: buildColoring(heatmap.models, c),
+      // Squares need both halves of the deal: color to carry the level,
+      // and a half block glyph to be square in the first place.
+      squares: c.isColorSupported && flags.ascii !== true,
     });
     for (const line of rendered) lines.push(line);
     lines.push("");
   }
 
+  // Each table gets the hue of the thing it lists, so the eye can jump
+  // straight to a section and the same hue means the same thing in
+  // every other command. Color stays on the heading, the row's own name
+  // and its share bar; the numbers are left plain and readable, and the
+  // layout survives color being stripped because the columns are
+  // aligned and the rule under the heading is drawn in text.
+  //
+  // rowPaint hues one row of the body, name and bar together. Returning
+  // undefined leaves the row plain, which is what a table with nothing
+  // per-row to say does.
+  const table = (
+    rows: string[][],
+    align: ("left" | "right")[],
+    head: Paint,
+    rowPaint?: (row: number) => Paint | undefined,
+  ): void => {
+    const last = (rows[0]?.length ?? 1) - 1;
+    const rendered = renderTable(rows, align, (cell, col, row) => {
+      if (row === 0) return c.bold(head(cell));
+      const paint = rowPaint?.(row - 1);
+      if (paint === undefined) return cell;
+      // The name says which row this is and the bar says how big it is.
+      // Those are the two cells worth hueing; the raw numbers between
+      // them read better plain.
+      return col === 0 || col === last ? paint(cell) : cell;
+    });
+    lines.push(`  ${rendered[0] ?? ""}`);
+    // A rule under the heading, sized to the widest row, so a long
+    // table reads as one block instead of a drift of numbers.
+    const width = Math.max(...rendered.map((line) => displayWidth(line)));
+    lines.push(`  ${c.dim(g.rule.repeat(width))}`);
+    for (const line of rendered.slice(1)) lines.push(`  ${line}`);
+  };
+
   const spendRow = (label: string, rollup: UsageRollup): string[] => [
     label,
     fmtUsd(rollup.usd),
-    `${fmtTokens(rollup.tokens.input)} in`,
-    `${fmtTokens(rollup.tokens.output)} out`,
-    `${fmtTokens(rollup.tokens.cacheRead)} cached`,
+    fmtTokens(rollup.tokens.input),
+    fmtTokens(rollup.tokens.output),
+    fmtTokens(rollup.tokens.cacheRead),
   ];
   // An explicit window collapses to a single row. Otherwise the two
   // rows climb one rung of the ladder as --span widens: today/week
   // becomes week/month.
-  let spendRows: string[][];
+  const spendRows: string[][] = [["period", "cost", "input", "output", "cached"]];
   if (windowGiven) {
-    spendRows = [spendRow("window", total)];
+    spendRows.push(spendRow("window", total));
   } else if (wideRows) {
-    spendRows = [spendRow("this week", week), spendRow("this month", month)];
+    spendRows.push(spendRow("this week", week), spendRow("this month", month));
   } else {
-    spendRows = [spendRow("today", today), spendRow("this week", week)];
+    spendRows.push(spendRow("today", today), spendRow("this week", week));
   }
-  for (const line of renderTable(spendRows, ["left", "right", "right", "right", "right"])) {
-    lines.push(`  ${line}`);
-  }
+  // No hue: a period is not one of the four things the scheme names,
+  // and the heading is doing the work here.
+  table(spendRows, ["left", "right", "right", "right", "right"], (t) => t);
   if (subagents.messages > 0 || retries.messages > 0) {
     lines.push(
       `  ${c.dim("of the total:")} subagents ${fmtUsd(subagents.usd)}` +
-        ` (${subagents.messages} msgs) · retries ${fmtUsd(retries.usd)}` +
+        ` (${subagents.messages} msgs) ${g.dot} retries ${fmtUsd(retries.usd)}` +
         ` (${retries.messages} msgs)`,
     );
   }
   lines.push("");
 
-  // Each table gets the hue of the thing it lists, so the eye can jump
-  // straight to a section and the same hue means the same thing in
-  // every other command. The heading is the only colored text in a
-  // table, which leaves the numbers plain and readable, and the layout
-  // survives color being stripped because the columns are aligned.
-  const heading = (table: string[], paint: (text: string) => string): void => {
-    lines.push(`  ${c.bold(paint(table[0] ?? ""))}`);
-    for (const line of table.slice(1)) lines.push(`  ${line}`);
-  };
-
-  const projectRows: string[][] = [["project", "sessions", "cost"]];
+  const projectRows: string[][] = [["project", "sessions", "cost", "share"]];
   for (const p of projects) {
-    projectRows.push([p.name, String(p.sessions), fmtUsd(p.rollup.usd)]);
+    projectRows.push([
+      p.name,
+      String(p.sessions),
+      fmtUsd(p.rollup.usd),
+      shareCell(p.rollup.usd, total.usd, g),
+    ]);
   }
-  heading(renderTable(projectRows, ["left", "right", "right"]), r.project);
+  table(projectRows, ["left", "right", "right", "left"], r.project, () => r.project);
   lines.push("");
 
-  const modelRows: string[][] = [["model", "messages", "cost"]];
+  // Models keep the hues the heatmap legend gave them, so a color in
+  // the grid can be looked up in this table.
+  const modelPaints = assignModelPaints(
+    c,
+    models.map(([model]) => shortModel(model)),
+  );
+  const modelRows: string[][] = [["model", "messages", "cost", "share"]];
   for (const [model, rollup] of models) {
-    modelRows.push([shortModel(model), String(rollup.messages), fmtUsd(rollup.usd)]);
+    modelRows.push([
+      shortModel(model),
+      String(rollup.messages),
+      fmtUsd(rollup.usd),
+      shareCell(rollup.usd, total.usd, g),
+    ]);
   }
-  heading(renderTable(modelRows, ["left", "right", "right"]), r.model);
+  table(modelRows, ["left", "right", "right", "left"], r.model, (row) =>
+    modelPaints.get(shortModel(models[row]?.[0] ?? "")),
+  );
   lines.push("");
 
-  const toolTableRows: string[][] = [["tool", "calls", "fails", "cost"]];
+  const toolTableRows: string[][] = [["tool", "calls", "fails", "cost", "share"]];
   for (const [category, stats] of toolRows) {
     toolTableRows.push([
       category,
       stats.calls === 0 ? "-" : String(stats.calls),
       stats.calls === 0 ? "-" : String(stats.failures),
       fmtUsd(stats.usd),
+      shareCell(stats.usd, total.usd, g),
     ]);
   }
-  heading(
-    renderTable(toolTableRows, ["left", "right", "right", "right"]),
+  // Tools carry the hue they wear in a transcript, so bash reads green
+  // here and green there. The ones with no transcript hue stay plain.
+  table(
+    toolTableRows,
+    ["left", "right", "right", "right", "left"],
     r.tool,
+    (row) => toolPaint(c, toolRows[row]?.[0] ?? ""),
   );
 
   if (total.unknownModels.length > 0) {

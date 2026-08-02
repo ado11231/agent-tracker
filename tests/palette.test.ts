@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assignModelPaints,
+  assignModelShades,
   modelPaint,
   roles,
   toolPaint,
@@ -97,6 +98,63 @@ describe("assignModelPaints", () => {
   it("paints nothing when color is off", () => {
     const paints = assignModelPaints(plain, ["opus-5", "fable-5"]);
     expect(paints.get("opus-5")!("x")).toBe("x");
+  });
+});
+
+describe("assignModelShades", () => {
+  it("gives each model four rising steps of its own hue", () => {
+    const shades = assignModelShades(c, ["opus-5", "fable-5"]);
+    const opus = shades.get("opus-5")!;
+    expect(opus).toHaveLength(4);
+    // The middle two steps are the plain and bright forms of the hue
+    // the model already had everywhere else.
+    expect(hueOf(opus[1]!)).toBe(MAGENTA);
+    expect(opus[2]!("x")).toContain("[95m");
+    // The ends are that same hue dimmed and bolded, so the four steps
+    // read as one color getting stronger rather than four colors.
+    expect(opus[0]!("x")).toContain("[2m");
+    expect(opus[3]!("x")).toContain("[1m");
+    // Every step is distinct, which is the whole point of a ramp.
+    expect(new Set(opus.map((paint) => paint("x"))).size).toBe(4);
+    // A second model still gets a different hue.
+    expect(hueOf(shades.get("fable-5")![1]!)).toBe(CYAN);
+  });
+
+  it("collapses to plain text when color is off", () => {
+    const shades = assignModelShades(plain, ["opus-5"]);
+    for (const paint of shades.get("opus-5")!) expect(paint("x")).toBe("x");
+    // Truecolor never overrides the decision not to color at all.
+    const vivid = assignModelShades(plain, ["opus-5"], true);
+    for (const paint of vivid.get("opus-5")!) expect(paint("x")).toBe("x");
+  });
+
+  // The channels of a 24 bit paint, or nothing if it is not one.
+  function channels(paint: (text: string) => string): [number, number, number] {
+    const match = /\[38;2;(\d+);(\d+);(\d+)m/.exec(paint("x"));
+    expect(match).not.toBeNull();
+    const [r, g, b] = [1, 2, 3].map((i) => Number(match?.[i] ?? 0));
+    return [r ?? 0, g ?? 0, b ?? 0];
+  }
+
+  const luma = ([r, g, b]: [number, number, number]): number =>
+    (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+
+  it("climbs in brightness on a truecolor terminal", () => {
+    for (const model of ["opus-5", "sonnet-5", "haiku-4-5", "fable-5"]) {
+      const ramp = assignModelShades(c, [model], true).get(model)!;
+      const steps = ramp.map(channels);
+      // Real 24 bit steps, each brighter than the one below it.
+      expect(steps.map(luma)).toEqual([...steps.map(luma)].sort((a, b) => a - b));
+      const bottom = steps[0]!;
+      // The quietest step is a lit, saturated color rather than a dark
+      // one: a day with spend must never read as quieter than the grey
+      // of a day without.
+      expect(Math.max(...bottom)).toBeGreaterThanOrEqual(180);
+      expect(Math.max(...bottom) - Math.min(...bottom)).toBeGreaterThanOrEqual(90);
+      // The busiest step stays a color rather than washing out to white.
+      expect(luma(steps[3]!)).toBeLessThan(0.95);
+      expect(Math.max(...steps[3]!) - Math.min(...steps[3]!)).toBeGreaterThan(40);
+    }
   });
 });
 

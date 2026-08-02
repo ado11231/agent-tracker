@@ -79,10 +79,13 @@ export function shortModel(model: string): string {
 }
 
 // Pads plain text cells into aligned columns. Styling happens after
-// padding so ansi codes never break the alignment.
+// padding so ansi codes never break the alignment: the optional paint
+// is handed the already padded cell with its column and row index, and
+// whatever it returns is dropped in as is.
 export function renderTable(
   rows: string[][],
   align: ("left" | "right")[],
+  paint?: (cell: string, column: number, row: number) => string,
 ): string[] {
   const widths: number[] = [];
   for (const row of rows) {
@@ -90,11 +93,16 @@ export function renderTable(
       widths[i] = Math.max(widths[i] ?? 0, cell.length);
     });
   }
-  return rows.map((row) =>
+  return rows.map((row, r) =>
     row
       .map((cell, i) => {
         const width = widths[i] ?? 0;
-        return align[i] === "right" ? cell.padStart(width) : cell.padEnd(width);
+        const padded =
+          align[i] === "right" ? cell.padStart(width) : cell.padEnd(width);
+        // Trailing pad on the last cell is trimmed before painting, so
+        // a styled line never ends in colored blanks.
+        const text = i === row.length - 1 ? padded.trimEnd() : padded;
+        return paint === undefined ? text : paint(text, i, r);
       })
       .join("  ")
       .trimEnd(),

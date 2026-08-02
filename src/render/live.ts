@@ -43,10 +43,14 @@ export function currentContext(session: ExtractedSession): CurrentContext {
 
 // The statusline panel, up to four rows, one job each:
 //
-//   sec-review  ·  opus-4-8  ·  high  ·  2 turns      what is running
-//   $0.19  ·  $2.40/hr  ·  $0.03 wasted  ·  +156 −23  what it cost
-//   ▓▓▓░░░░░░░░░░░  14%   27.4k / 200k ctx            room left
-//   ▓▓▓▓░░░░░░░░░░  24%   5h · 41% week · 89% cache   quota left
+//   sec-review · opus-4-8 · high · 2 turns                what is running
+//   $0.19 · $2.40/hr · $0.03 wasted · +156 −23            what it cost
+//   ctx  ▓▓▓░░░░░░░░░░░░░░░░░  14%   27.4k / 200k         room left
+//   5h   ▓▓▓▓▓░░░░░░░░░░░░░░░  24%   41% week · 89% cache  quota left
+//
+// The two gauges label themselves in a fixed left column, so the bars
+// start in the same place and the pair reads as one block rather than
+// as two unrelated lines.
 //
 // Each returned string is one row, since Claude Code renders a line
 // of output per row. Every row and every segment within a row drops
@@ -83,10 +87,21 @@ export interface PanelOptions {
   width?: number;
 }
 
-const GAUGE_WIDTH = 14;
+const GAUGE_WIDTH = 20;
+// A gauge row is a label, a bar and a percentage; only the bar can give
+// ground. Below this it stops being a bar and becomes a smudge, so a
+// terminal narrower than that gets an overflowing row rather than a
+// meaningless one.
+const GAUGE_MIN = 6;
 // Plain spacing after a gauge, wider than the dot separator so the bar
 // reads as its own object rather than as the first field in a list.
 const GAUGE_GAP = "   ";
+// The label column ahead of a gauge. Both gauge rows pad their label to
+// the same width, so the two bars start in the same column and stack as
+// one block instead of two loose lines. A longer label is not cut: it
+// only ever appears on a panel drawing a single gauge, where there is
+// nothing to line up with.
+const LABEL_WIDTH = 3;
 const GAUGE_WARN = 0.5;
 const GAUGE_DANGER = 0.8;
 
@@ -111,30 +126,53 @@ export function fillPaint(c: Style, ratio: number): Paint {
 
 // Emptier is worse. Kept separate from fillPaint rather than folded in
 // as an inverted flag, because the thresholds are genuinely different
-// numbers and not a mirror of each other.
-function cachePaint(c: Style, ratio: number): Paint {
+// numbers and not a mirror of each other. Exported for the dashboard
+// headline, so a cache share reads the same color there as it does on
+// the statusline.
+export function cachePaint(c: Style, ratio: number): Paint {
   const r = roles(c);
   return ratio >= CACHE_GOOD ? r.ok : ratio >= CACHE_POOR ? r.warn : r.danger;
 }
 
-export function bar(ratio: number, g: GlyphSet): string {
+export function bar(ratio: number, g: GlyphSet, width = GAUGE_WIDTH): string {
   // Always show at least one filled cell once anything is used, so a
   // low percentage still reads as started rather than empty.
-  const filled = Math.min(
-    GAUGE_WIDTH,
-    Math.max(1, Math.round(ratio * GAUGE_WIDTH)),
-  );
-  return g.gaugeFull.repeat(filled) + g.gaugeEmpty.repeat(GAUGE_WIDTH - filled);
+  const filled = Math.min(width, Math.max(1, Math.round(ratio * width)));
+  return g.gaugeFull.repeat(filled) + g.gaugeEmpty.repeat(width - filled);
+}
+
+// The bar takes whatever the row can spare. Everything else on a gauge
+// row is a known width — the label, a 4 column percentage and two gaps
+// of two — so the bar is the only part that can stretch or shrink with
+// the terminal. A label wider than the column, which only the lone
+// cache gauge is, is charged to the bar rather than allowed to push the
+// row past the edge.
+function gaugeWidth(label: string, width: number | undefined): number {
+  if (width === undefined) return GAUGE_WIDTH;
+  const fixed = Math.max(LABEL_WIDTH, label.length) + 2 + 2 + 4;
+  return Math.max(GAUGE_MIN, Math.min(GAUGE_WIDTH, width - fixed));
 }
 
 function pct(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
 }
 
-// A gauge and its percentage, both in the same color. The percent is
-// padded so whatever follows it does not jitter as the number grows.
-function gauge(ratio: number, paint: Paint, g: GlyphSet): string {
-  return `${paint(bar(ratio, g))}  ${paint(pct(ratio).padStart(4))}`;
+// A named gauge: what is being measured, the bar, and the percentage,
+// all in the same color. The label says which limit this is at any
+// width, which is why it leads rather than trailing the bar. The
+// percent is padded so whatever follows it does not jitter as the
+// number grows.
+function gauge(
+  label: string,
+  ratio: number,
+  paint: Paint,
+  options: PanelOptions,
+): string {
+  return [
+    paint(label.padEnd(LABEL_WIDTH)),
+    paint(bar(ratio, options.g, gaugeWidth(label, options.width))),
+    paint(pct(ratio).padStart(4)),
+  ].join("  ");
 }
 
 // One row before it is fitted to the terminal. The lead is the field
@@ -200,7 +238,7 @@ function identityRow(
       host.fastMode ? "fast" : undefined,
       `${summary.turns} ${summary.turns === 1 ? "turn" : "turns"}`,
     ],
-    c.dim(`  ${options.g.dot}  `),
+    c.dim(` ${options.g.dot} `),
   );
 }
 
@@ -230,7 +268,7 @@ function costRow(
         ? `${r.ok(`+${added}`)} ${r.danger(`${g.minus}${removed}`)}`
         : undefined,
     ],
-    c.dim(`  ${g.dot}  `),
+    c.dim(` ${g.dot} `),
   );
 }
 
@@ -241,10 +279,11 @@ function contextRow(tokens: number, options: PanelOptions): PanelRow {
   const { c, g } = options;
   const ratio = Math.min(tokens / options.contextWindow, 1);
   const paint = fillPaint(c, ratio);
-  const detail = `${fmtTokens(tokens)} / ${fmtTokens(options.contextWindow)} ctx`;
+  // No "ctx" suffix on the counts: the gauge label already said it.
+  const detail = `${fmtTokens(tokens)} / ${fmtTokens(options.contextWindow)}`;
   // The token detail takes the gauge's color too: it is the same
   // measurement, and it has to stay readable at statusline size.
-  return panelRow([gauge(ratio, paint, g), paint(detail)], GAUGE_GAP);
+  return panelRow([gauge("ctx", ratio, paint, options), paint(detail)], GAUGE_GAP);
 }
 
 // Row 4 — how much quota is left, plus the cache share, which belongs
@@ -273,10 +312,7 @@ function limitsRow(
     const week = host.sevenDay;
     return panelRow(
       [
-        // The window label rides with the gauge instead of being a
-        // droppable field of its own, so the row still says which
-        // limit it is drawing at any width.
-        `${gauge(ratio, paint, g)}${GAUGE_GAP}${paint("5h")}`,
+        gauge("5h", ratio, paint, options),
         week === undefined
           ? undefined
           : fillPaint(c, week.usedPercentage / 100)(
@@ -285,12 +321,16 @@ function limitsRow(
         cacheText,
       ],
       sep,
+      // Plain spacing between the gauge and the fields it leads, the
+      // same as the context row, so the two bars sit in a block and
+      // what follows them starts at the same place.
+      GAUGE_GAP,
     );
   }
 
   if (cache === undefined) return undefined;
   const paint = cachePaint(c, cache);
-  return panelRow([gauge(cache, paint, g), paint("cache hit")], GAUGE_GAP);
+  return panelRow([gauge("cache", cache, paint, options), paint("hit rate")], GAUGE_GAP);
 }
 
 export function statuslinePanel(

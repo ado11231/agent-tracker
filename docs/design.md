@@ -346,11 +346,17 @@ row per printed line, in its own block **above** the built-in footer badges
 (it does not replace them).
 
 ```
-sec-review  ·  opus-4-8  ·  high  ·  2 turns        what is running
-$0.19  ·  $2.40/hr  ·  $0.03 wasted  ·  +156 −23    what it cost
-▓▓▓░░░░░░░░░░░  14%   27.4k / 200k ctx              room left
-▓▓▓▓░░░░░░░░░░  24%   5h · 41% week · 89% cache     quota left
+sec-review · opus-4-8 · high · 2 turns                 what is running
+$0.19 · $2.40/hr · $0.03 wasted · +156 −23             what it cost
+ctx  ▓▓▓░░░░░░░░░░░░░░░░░  14%   27.4k / 200k          room left
+5h   ▓▓▓▓▓░░░░░░░░░░░░░░░  24%   41% week · 89% cache   quota left
 ```
+
+Each gauge names itself in a fixed left column, so the two bars start in the
+same place and stack as one block rather than two loose lines. The bar is 20
+cells and is the only part of a gauge row that can give ground: label,
+percentage and gaps are fixed, so a narrow terminal shrinks the bar (down to
+6, past which it is a smudge rather than a gauge) instead of overflowing.
 
 Every row and every segment drops out when its data is missing, rather than
 rendering a zero — so the panel shrinks back to two rows on an API plan with
@@ -391,9 +397,9 @@ are already ordered most to least important left to right, which is the whole
 priority model — nothing is re-ranked. The leading field never drops, so the
 row is either absent or still answers the question it exists for: the identity
 row keeps the session name, the cost row keeps the cost, and a gauge row keeps
-its bar and percentage. The `5h` label rides with the quota gauge instead of
-being a droppable field of its own, so that row always says which limit it is
-drawing.
+its label, bar and percentage. The label leads the gauge rather than being a
+droppable field after it, so a row cut back to the bar still says which limit
+it is drawing.
 
 The width comes from `COLUMNS`, falling back to `process.stdout.columns`.
 Claude Code captures our stdout to draw the panel inside its own frame, so
@@ -612,6 +618,78 @@ strip, plus 9 columns of gutter, frame and padding. A full 53 week year
 therefore needs 115 columns; narrower drops the oldest weeks from the left
 rather than closing the gaps or wrapping, and the caption says how many weeks
 survived.
+
+Cells are held apart on **both** axes, and how depends on whether color is
+going to reach the reader:
+
+- **Squares** (color on, unicode glyphs). Every day is a block filling the
+  bottom three quarters of its cell, and the empty strip above it *is* the
+  vertical gap — so the grid is seven lines with no spacers, the way a
+  contribution graph looks. Three quarters rather than a half because a
+  terminal cell is about twice as tall as it is wide: at a half the vertical
+  gap came out wider than the mark while the horizontal gap is a little over
+  half a mark, and the lattice read loose. One blank column is the floor
+  horizontally — at zero, two days of the same color merge into a stripe, so
+  that is as close together as the grid goes. Level rides on brightness of
+  the day's model hue, four steps of it (`hueShades`). Empty days stay visible
+  in grey rather than dimming away, since the lattice is what makes it a
+  calendar.
+
+  The four steps come from **truecolor when the terminal announces it**
+  (`COLORTERM`), and from the 16 color palette — dimmed, plain, bright,
+  bright bold — when it does not. This is the one place ccplus reaches past
+  16 colors, and it earns it: the 16 color ramp has to spend its bottom step
+  on `dim`, and the bottom step is where most days land, so a quiet day came
+  out duller than the grey of a day with no spend at all. The 24 bit ramps
+  hold their hue and climb in lightness, with the bottom step lit and
+  saturated and the top still a color rather than a pastel.
+- **Shades** (piped, `NO_COLOR`, or `--ascii`). The `·░▒▓█` ramp carries the
+  level in the glyph, and a blank run of the frame goes between each pair of
+  weekday rows — thirteen lines. Without that gap the ramp glyphs, which fill
+  the whole character cell, fuse a run of consecutive days into one vertical
+  bar.
+
+The two modes are the same grid drawn with whatever the medium has. The
+constraint that survives both: magnitude is never carried by color alone.
+
+Under the grid: the stat strip, a blank line, then the two legends. The
+legends use a **centered square**, not the grid's mark — a block sitting on
+the floor of its cell lines up with the row above it in a grid but looks
+dropped beside a word, and a legend is a line of text. The model legend takes
+the third ramp step rather than the fourth: the top of a ramp is its lightest
+point, which is right for a busy day in a grid and washed out for a word.
+
+The words in that strip — `most active`, `longest`, `current`, `less`,
+`more` — are plain, not dim. Dim is for chrome that places the grid (the
+month and weekday axis labels); these name the numbers beside them and have
+to read at full contrast.
+
+### Dashboard layout
+
+Four blocks, in the order the questions get asked:
+
+1. **Masthead** — the name, then four tiles: total spend, sessions, messages,
+   cache hit. The label reads first and plain, so it takes the terminal's own
+   foreground instead of a grey that fights the theme; the number sits under
+   it in bold. Both are padded to one width so the pair reads as a column.
+   Only the cache share takes a hue, the same `cachePaint` thresholds the
+   statusline uses, so a bad cache share reads red on both surfaces. No rule
+   under the name: a line that long is the widest thing on screen and reads as
+   a divider between halves of a report rather than as a heading for the block
+   under it. The blank line does that job.
+2. **Heatmap**, on `--span year` only.
+3. **Spend rows** — period, cost, input, output, cached. No hue: a period is
+   not one of the four things the color scheme names.
+4. **Breakdown tables** — project, model, tool. Each is a heading in the hue
+   of the thing it lists, a dim rule as wide as the widest row, then the rows.
+   A **share** column closes every table: a 10 cell gauge of that row's slice
+   of the total, plus the percentage, so a table can be read as a shape before
+   any of its numbers are.
+
+Within a table, color marks the row's **name** and its **share bar** only,
+never the raw numbers between them. Model rows take the hue the heatmap legend
+assigned that model, and tool rows take the hue the tool wears in a transcript,
+so a color always means the same thing across commands.
 
 **Flag surface (2026-07-27):** 15 flags over 5 commands. Six are global
 (`--json`, `--no-color`, `--ascii`, `--project`, `--since`, `--until`); the

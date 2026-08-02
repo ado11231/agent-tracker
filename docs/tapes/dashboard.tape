@@ -14,7 +14,11 @@ Set Padding 24
 # starts dropping the oldest weeks from the left, which is correct
 # behaviour and the wrong thing to lead the README with.
 Set Width 1240
-Set Height 900
+# The year view is 45 lines with the demo sessions: a recording has
+# color, so the grid draws squares and needs no spacer rows, and the
+# masthead and table rules cost a few lines back. Too short and vhs
+# scrolls the top of the frame away.
+Set Height 880
 Set Theme "Catppuccin Mocha"
 
 Hide

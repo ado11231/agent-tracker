@@ -186,7 +186,7 @@ describe("statuslinePanel", () => {
   }
 
   it("puts model and turns on the identity row", () => {
-    expect(panel(27_400)[0]).toBe("opus-4-8  ·  2 turns");
+    expect(panel(27_400)[0]).toBe("opus-4-8 · 2 turns");
   });
 
   it("puts cost on its own row", () => {
@@ -198,7 +198,9 @@ describe("statuslinePanel", () => {
     expect(row).toContain("▓");
     expect(row).toContain("░");
     expect(row).toContain("14%");
-    expect(row).toContain("27.4k / 200k ctx");
+    // The label says what is being measured, so the counts drop "ctx".
+    expect(row).toMatch(/^ctx {2}▓/);
+    expect(row).toContain("27.4k / 200k");
   });
 
   it("fills the gauge proportionally", () => {
@@ -208,13 +210,13 @@ describe("statuslinePanel", () => {
   });
 
   it("shows at least one filled cell once any context is used", () => {
-    expect(panel(200)[2] as string).toMatch(/^▓░+/);
+    expect(panel(200)[2] as string).toMatch(/^ctx {2}▓░+/);
   });
 
   it("respects a larger context window from the session json", () => {
     const row = panel(200_000, 1_000_000)[2] as string;
     expect(row).toContain("20%");
-    expect(row).toContain("200k / 1.0M ctx");
+    expect(row).toContain("200k / 1.0M");
   });
 
   it("drops the context row before the first api call", () => {
@@ -240,7 +242,7 @@ describe("statuslinePanel", () => {
       effort: "high",
       fastMode: true,
     })[0] as string;
-    expect(row).toBe("sec-review  ·  opus-4-8  ·  high  ·  fast  ·  2 turns");
+    expect(row).toBe("sec-review · opus-4-8 · high · fast · 2 turns");
   });
 
   it("falls back to the agent name when the session is unnamed", () => {
@@ -288,8 +290,7 @@ describe("statuslinePanel", () => {
       fiveHour: { usedPercentage: 24 },
       sevenDay: { usedPercentage: 41.2 },
     })[3] as string;
-    expect(row).toMatch(/^▓+░+ +24%/);
-    expect(row).toContain("5h");
+    expect(row).toMatch(/^5h {3}▓+░+ +24%/);
     expect(row).toContain("41% week");
   });
 
@@ -313,8 +314,8 @@ describe("statuslinePanel", () => {
       },
     });
     expect(rows).toHaveLength(4);
-    expect(rows[3]).toContain("90%");
-    expect(rows[3]).toContain("cache hit");
+    expect(rows[3]).toMatch(/^cache {2}▓+░* +90%/);
+    expect(rows[3]).toContain("hit rate");
   });
 
   it("appends the cache share to the rate limit row when both exist", () => {
@@ -343,10 +344,10 @@ describe("statuslinePanel", () => {
   });
 
   // The four rows at their full width, which the cases below narrow:
-  //   sec-review  ·  opus-4-8  ·  high  ·  fast  ·  2 turns   53
-  //   $0.19  ·  $0.19/hr  ·  +156 −23                         31
-  //   ▓▓░░░░░░░░░░░░   14%   27.4k / 200k ctx                 39
-  //   ▓▓▓░░░░░░░░░░░   24%   5h · 41% week · 90% cache        48
+  //   sec-review · opus-4-8 · high · fast · 2 turns           45
+  //   $0.19 · $0.19/hr · +156 −23                             27
+  //   ctx  ▓▓▓░░░░░░░░░░░░░░░░░   14%   27.4k / 200k          46
+  //   5h   ▓▓▓▓▓░░░░░░░░░░░░░░░   24%   41% week · 90% cache  54
   function wide(width?: number): string[] {
     return panel(
       27_400,
@@ -381,15 +382,19 @@ describe("statuslinePanel", () => {
   }
 
   it("drops fields from the right of a row too wide for the terminal", () => {
-    const rows = wide(45);
-    expect(rows[0]).toBe("sec-review  ·  opus-4-8  ·  high  ·  fast");
-    for (const row of rows) expect(row.length).toBeLessThanOrEqual(45);
+    const rows = wide(40);
+    expect(rows[0]).toBe("sec-review · opus-4-8 · high · fast");
+    for (const row of rows) expect(row.length).toBeLessThanOrEqual(40);
   });
 
   it("shortens only the rows that do not fit", () => {
-    const rows = wide(45);
+    // 46 columns is exactly the context row, so only the limits row
+    // above it has anything to give up.
+    const rows = wide(46);
+    expect(rows[0]).toBe(wide()[0]);
     expect(rows[1]).toBe(wide()[1]);
     expect(rows[2]).toBe(wide()[2]);
+    expect(rows[3]).not.toBe(wide()[3]);
   });
 
   it("keeps the leading field of a row when nothing else fits", () => {
@@ -400,20 +405,23 @@ describe("statuslinePanel", () => {
 
   it("keeps a gauge and its percent when the detail beside it will not", () => {
     const rows = wide(30);
-    expect(rows[2]).toBe("▓▓░░░░░░░░░░░░   14%");
-    // The window label rides with the gauge, so the row still says
-    // which limit it is drawing.
-    expect(rows[3]).toBe("▓▓▓░░░░░░░░░░░   24%   5h");
+    // The label leads the gauge, so a row stripped back to the bar
+    // still says which limit it is drawing. The bar itself narrows to
+    // whatever the terminal left it.
+    expect(rows[2]).toMatch(/^ctx {2}▓+░+ {3}14%$/);
+    expect(rows[3]).toMatch(/^5h {3}▓+░+ {3}24%$/);
+    for (const row of rows) expect(row.length).toBeLessThanOrEqual(30);
   });
 
   it("shortens nothing when the width is unknown", () => {
     expect(wide(undefined)[0]).toBe(
-      "sec-review  ·  opus-4-8  ·  high  ·  fast  ·  2 turns",
+      "sec-review · opus-4-8 · high · fast · 2 turns",
     );
   });
 
   it("measures the visible width, not the ansi escapes", () => {
-    // Styled, this row is far past 39 bytes and still 39 columns.
+    // Styled, this row is far past 46 bytes and still 46 columns, so
+    // the detail survives rather than being counted out by escapes.
     const row = statuslinePanel(
       summary({ total: { ...emptyRollup(), usd: 0.19 }, turns: 2 }),
       { tokens: 27_400, model: "claude-opus-4-8" },
@@ -421,11 +429,11 @@ describe("statuslinePanel", () => {
         c: makeStyle(true),
         g: glyphsFor(false),
         contextWindow: 200_000,
-        width: 39,
+        width: 46,
       },
     )[2] as string;
-    expect(row.length).toBeGreaterThan(39);
-    expect(row).toContain("27.4k / 200k ctx");
+    expect(row.length).toBeGreaterThan(46);
+    expect(row).toContain("27.4k / 200k");
   });
 });
 

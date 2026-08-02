@@ -64,4 +64,21 @@ describe("formatting", () => {
       "longer-id  $10.00",
     ]);
   });
+
+  it("paints cells after padding, so styling cannot shift a column", () => {
+    const lines = renderTable(
+      [
+        ["id", "cost"],
+        ["abc", "$1.00"],
+      ],
+      ["left", "right"],
+      // Marks the header row and every cost cell, which is the shape
+      // the dashboard uses.
+      (cell, column, row) =>
+        row === 0 ? `<${cell}>` : column === 1 ? `[${cell}]` : cell,
+    );
+    // The padding is inside the markers: the plain widths are what
+    // decided the layout.
+    expect(lines).toEqual(["<id >  < cost>", "abc  [$1.00]"]);
+  });
 });

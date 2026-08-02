@@ -178,6 +178,63 @@ describe("dashboard", () => {
     expect(text).not.toContain("[");
   });
 
+  it("heads the report with the four numbers and their labels", async () => {
+    const code = await runDashboard(flags(await makeRoot(), { json: false }));
+    expect(code).toBe(0);
+    const lines = logged().split("\n");
+    // The name alone, a blank, then the labels over their values. No
+    // rule under the name: the blank line is the separation.
+    expect(lines[0]).toBe("  ccplus");
+    const labels = lines.findIndex((line) => line.includes("cache hit"));
+    expect(labels).toBeGreaterThan(0);
+    for (const label of ["all time", "sessions", "messages", "cache hit"]) {
+      expect(lines[labels]).toContain(label);
+    }
+    // The values sit on the line below, leading with the total spend
+    // and closing on the cache share, each under its own label.
+    const values = lines[labels + 1] ?? "";
+    expect(values).toMatch(/^ {2}\$\d/);
+    expect(values).toMatch(/%$/);
+    expect(values.indexOf("%")).toBeGreaterThan(
+      (lines[labels] ?? "").indexOf("cache hit"),
+    );
+  });
+
+  it("gives every table a rule and a share bar", async () => {
+    const code = await runDashboard(flags(await makeRoot(), { json: false }));
+    expect(code).toBe(0);
+    const lines = logged().split("\n");
+    const heads = lines.filter((line) =>
+      /^ {2}(project|model|tool|period) /.test(line),
+    );
+    expect(heads).toHaveLength(4);
+    // Each heading is underlined by a rule at least as wide as it is.
+    for (const head of heads) {
+      const rule = lines[lines.indexOf(head) + 1] ?? "";
+      expect(rule).toMatch(/^ {2}─+$/);
+      expect(rule.length).toBeGreaterThanOrEqual(head.length);
+    }
+    // The share column reads as a bar and a percentage.
+    expect(lines.some((line) => /▓+░* +\d+%$/.test(line))).toBe(true);
+    // Shares are of the whole, so none can read over 100%.
+    for (const line of lines) {
+      const match = /(\d+)%$/.exec(line);
+      if (match) expect(Number(match[1])).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it("swaps the share bar and rule glyphs under --ascii", async () => {
+    const code = await runDashboard({
+      ...flags(await makeRoot(), { json: false }),
+      ascii: true,
+    });
+    expect(code).toBe(0);
+    const text = logged();
+    expect(text).not.toContain("▓");
+    expect(text).not.toContain("─");
+    expect(text).toMatch(/#+-* +\d+%/);
+  });
+
   it("adds the activity heatmap only when --year is given", async () => {
     const root = await makeRoot();
     // Default run carries no heatmap keys.
@@ -216,9 +273,11 @@ describe("dashboard", () => {
       ascii: true,
     });
     expect(code).toBe(0);
-    // The ascii ramp is . : + * # — none of the unicode ramp cells.
+    // The ascii ramp is . : + * # — none of the unicode ramp cells,
+    // and the caption's separators swap with it.
     expect(logged()).not.toContain("█");
     expect(logged()).not.toContain("▓");
+    expect(logged()).not.toContain("·");
   });
 
   it("names each day's top model in json under --year", async () => {

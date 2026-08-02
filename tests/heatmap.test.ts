@@ -130,14 +130,21 @@ describe("renderHeatmap", () => {
     });
   }
 
+  // The framed rows that carry cells, with the blank spacers between
+  // them left out.
+  const dayRows = (lines: string[]): string[] =>
+    lines.filter((line) => line.includes("┃") && /[·░▒▓█]/.test(line));
+
   it("draws a caption, seven weekday rows, a stat strip, and two legends", () => {
     const lines = render(false);
     const text = lines.join("\n");
     expect(lines[0]).toContain("daily cost");
     expect(lines[0]).toContain("by model");
-    // caption, month header, top border, seven rows, bottom border,
-    // blank, stats, ramp legend, model legend
-    expect(lines).toHaveLength(15);
+    // caption, month header, top border, seven rows each followed by a
+    // blank spacer bar the last, bottom border, blank, stats, blank,
+    // ramp legend, model legend
+    expect(lines).toHaveLength(22);
+    expect(dayRows(lines)).toHaveLength(7);
     for (const label of ["Mon", "Wed", "Fri"]) expect(text).toContain(label);
     expect(text).toContain("most active");
     expect(text).toContain("less ");
@@ -166,7 +173,7 @@ describe("renderHeatmap", () => {
   });
 
   it("keeps the cells off the frame and off each other", () => {
-    const rows = render(false).slice(3, 10);
+    const rows = dayRows(render(false));
     for (const row of rows) {
       // A cell never abuts the frame on either side.
       expect(row).toMatch(/┃ /);
@@ -175,6 +182,68 @@ describe("renderHeatmap", () => {
     // Two glyphs never end up adjacent, whatever the width.
     const interior = (rows[4] ?? "").replace(/^.*┃/, "").replace(/┃$/, "");
     expect(interior).not.toMatch(/[·░▒▓█]{2}/);
+  });
+
+  // Square mode hands the level to the paint instead of the glyph, so
+  // a marker paint is enough to prove the level got there.
+  function squareRender(): string[] {
+    return renderHeatmap({
+      daily,
+      stats,
+      from,
+      to,
+      weeks,
+      glyphs: glyphsFor(false),
+      style: plain,
+      squares: true,
+      coloring: {
+        dayCategory: coloring.dayCategory,
+        order: coloring.order,
+        colorOf: (_model: string, level: number) => (text: string) =>
+          `<${level}>${text}`,
+      },
+    });
+  }
+
+  it("draws one square per day when color can carry the level", () => {
+    const lines = squareRender();
+    const framed = lines.filter((line) => line.includes("┃"));
+    // Seven rows and no spacers: a half block already leaves the top
+    // half of its line empty, which is the gap.
+    expect(framed).toHaveLength(7);
+    for (const line of framed) {
+      expect(line).toContain("▆");
+      // None of the shade ramp survives; every day is the same shape.
+      expect(line).not.toMatch(/[·░▒▓█]/);
+    }
+  });
+
+  it("sends the day's level to the paint in square mode", () => {
+    const text = squareRender().join("\n");
+    // The three spend days sit at three different levels, and each one
+    // reaches the paint rather than changing the glyph.
+    expect(text).toMatch(/<1>▆/);
+    expect(text).toMatch(/<4>▆/);
+    // The ramp legend runs the whole scale; the model legend takes the
+    // third step, the top being too light to read as a word.
+    const legend = squareRender().at(-1) ?? "";
+    expect(legend).toContain("<3>■ fable-5");
+  });
+
+  it("holds the weekday rows apart with an empty run of the frame", () => {
+    const lines = render(false);
+    const framed = lines.filter((line) => line.includes("┃"));
+    // Thirteen framed lines: seven day rows with a spacer between each
+    // pair, so no two days ever share an edge vertically.
+    expect(framed).toHaveLength(13);
+    for (let i = 0; i < framed.length; i++) {
+      const line = framed[i] ?? "";
+      const isDay = /[·░▒▓█]/.test(line);
+      expect(isDay).toBe(i % 2 === 0);
+      // A spacer is frame, blanks, frame — the same width as a day row.
+      if (!isDay) expect(line).toMatch(/┃ +┃$/);
+      expect(line.length).toBe((framed[0] ?? "").length);
+    }
   });
 
   it("stretches the columns apart when the terminal is wide", () => {
@@ -203,9 +272,7 @@ describe("renderHeatmap", () => {
   });
 
   it("leaves future days blank in the final column", () => {
-    // After the caption, month header, and top border, the seven
-    // weekday rows run to the bottom border.
-    const rows = render(false).slice(3, 10);
+    const rows = dayRows(render(false));
     // Every cell now carries a trailing gap, so a row cannot be
     // checked by what it ends with. Where the last glyph sits is the
     // real question: Sunday (row 0) is `to` and fills the final
