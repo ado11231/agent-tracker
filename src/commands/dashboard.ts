@@ -550,8 +550,8 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
       shareCell(stats.usd, total.usd, g),
     ]);
   }
-  // Tools carry the hue they wear in a transcript, so bash reads green
-  // here and green there. The ones with no transcript hue stay plain.
+  // Tools carry the hue they wear in context, so bash reads green here
+  // and green there. The ones with no tool hue stay plain.
   table(
     toolTableRows,
     ["left", "right", "right", "right", "left"],

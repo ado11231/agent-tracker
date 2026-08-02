@@ -6,14 +6,11 @@
 
 A **TypeScript npm CLI** for Claude Code observability. It reads the local
 session logs Claude Code already writes (`~/.claude/projects/<slug>/<session-id>.jsonl`)
-and provides two things:
-
-1. **Metrics** — where tokens/dollars went, per session / day / project / model
-2. **Transcript viewer** — any session rendered as a clean, color-coded,
-   readable conversation in the terminal
+and reports where tokens and dollars went — per session, day, project, and
+model — plus live surfaces for Claude Code's status line and context window.
 
 One-sentence identity: *a local, offline CLI that tells you where your Claude
-Code tokens went, and shows you any session as a readable transcript.*
+Code tokens went.*
 
 ## Hard constraints (never violate)
 
@@ -31,12 +28,11 @@ Code tokens went, and shows you any session as a readable transcript.*
 - **Cut: model rerouting.** No supported hook exists in Claude Code; it would
   just be a settings.json editor. Not observability. Possible v2 shape:
   analytics-driven "suggested model" *insights*, no switching.
+- **Cut: transcript viewer (`view` / `--follow` / export).** Metrics and live
+  context are the product. A readable session dump diluted that; the renderer
+  and command surface went with it.
 - **Cut: LLM-powered bash explanation.** Unneeded — every Bash tool_use in the
-  logs already carries a model-written `description` field. The viewer shows
-  the description bold, the raw command dimmed beneath it.
-- **Viewer is static terminal output** (pipeable, less-friendly), not an Ink
-  TUI and not HTML. Markdown export comes in Phase 3; TUI is a distant
-  maybe.
+  logs already carries a model-written `description` field.
 - **Cut: budgets/alerts** (needs a daemon) and **multi-tool support** (Codex
   CLI etc. — dilutes identity; revisit later, if ever).
 - **TypeScript**, not Python — the Claude Code tooling ecosystem is
@@ -47,7 +43,7 @@ Code tokens went, and shows you any session as a readable transcript.*
 Three internal modules, one dependency direction:
 
 ```
-parser  →  cost engine  →  renderers (dashboard, transcript)
+parser  →  cost engine  →  renderers (dashboard, live, reports)
 ```
 
 - `parser/` has **zero imports from the other two** — it may become a published

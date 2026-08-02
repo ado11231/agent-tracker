@@ -8,10 +8,9 @@ import { glyphsFor } from "../render/glyphs.js";
 import { bar, fillPaint } from "../render/live.js";
 import { roles, toolPaint } from "../render/palette.js";
 import { colorEnabled, makeStyle } from "../render/style.js";
-import { contentWidth, truncatePath, wrapPlain } from "../render/text.js";
-import { shortenPath } from "../render/transcript.js";
+import { contentWidth, shortenPath, truncatePath, wrapPlain } from "../render/text.js";
 import type { CommandFlags } from "./load.js";
-import { resolveTarget } from "./view.js";
+import { resolveTarget } from "./target.js";
 
 // What is filling the context window of one session, and where it
 // came from. The reason to reach for this over the statusline gauge:

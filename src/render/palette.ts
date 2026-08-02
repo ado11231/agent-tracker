@@ -179,18 +179,11 @@ export function assignModelShades(
   return shades;
 }
 
-// Tool glyphs in a transcript. A transcript has four hues to spend and
-// more things than that worth marking, so they go to what a reader
-// scans for: cyan for your own words, and one each for the three tools
-// that make up nearly every session. Green ran something, magenta
-// changed a file, blue read one.
-//
-// The rest keep their glyph and no hue. Web, mcp and agent calls are
-// rare enough that a shape is plenty, and spending a hue on them would
-// cost cyan the one job it has here.
-//
-// Nothing is yellow or red. A red line in a transcript means a call
-// failed, which is the thing worth scanning for.
+// Tool category hues for the context and dashboard reports. Green ran
+// something, magenta changed a file, blue read one. The rest keep their
+// glyph and take no hue — web, mcp and agent calls are rare enough that
+// a shape is plenty. Nothing is yellow or red: those two stay reserved
+// for failure and attention everywhere.
 export function toolPaint(c: Style, category: string): Paint {
   switch (category) {
     case "bash":
@@ -202,9 +195,4 @@ export function toolPaint(c: Style, category: string): Paint {
     default:
       return plain;
   }
-}
-
-// Your own prompts, the landmark you scroll a transcript looking for.
-export function userPaint(c: Style): Paint {
-  return (text) => c.bold(c.cyan(text));
 }

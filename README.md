@@ -1,7 +1,6 @@
 # ccplus
 
-Where your Claude Code money went, and any session read back as a proper
-conversation.
+Where your Claude Code money went.
 
 Claude Code already writes a log for every session. ccplus just reads them.
 Nothing is sent anywhere, nothing is written outside its own install, no config
@@ -24,7 +23,6 @@ While a session is running:
 | --- | --- |
 | `ccplus statusline` | a panel for Claude Code's status line |
 | `ccplus context` | what is filling the context window |
-| `ccplus view --follow` | the transcript, appended live |
 
 Afterwards:
 
@@ -32,7 +30,6 @@ Afterwards:
 | --- | --- |
 | `ccplus` | where the money went, today and this week |
 | `ccplus sessions` | recent sessions with cost, duration, and turns |
-| `ccplus view [id]` | read a session back |
 | `ccplus doctor` | anything it could not parse or price |
 
 ## Context
@@ -49,19 +46,6 @@ says so: every estimated number wears a `~`, and a footnote tells you how much
 of the window the log could actually see. The
 [design notes](docs/design.md) have the working.
 
-## View
-
-A session as something you can actually read. `--full` opens up the raw
-commands, tool output and thinking. `--costs` puts a price on every call.
-`--export` writes markdown, for a gist or a pull request.
-
-![A session transcript: your prompts in cyan, tool calls with a glyph and a one line description, thinking collapsed to a count](docs/images/view.png)
-
-Add `--follow` and it stays open, appending turns as they arrive. `--compact`
-turns that into a cost log instead, one line each time the numbers move.
-
-![view --follow appending turns live as a session runs](docs/images/follow.gif)
-
 ## Dashboard and sessions
 
 `ccplus` on its own gives the image at the top of this page: today and this
@@ -70,9 +54,8 @@ contribution graph: one square per day, tinted by whichever model spent the
 most on it and brightening with how much. Piped or under `NO_COLOR`, where
 brightness cannot say it, the squares become a shade ramp that can.
 
-`ccplus sessions` lists them newest first. The short id is what `view` wants,
-and any unambiguous prefix will do. `--grep` searches what you typed and shows
-the line that matched.
+`ccplus sessions` lists them newest first. `--grep` searches what you typed
+and shows the line that matched.
 
 ## Statusline
 
@@ -100,7 +83,6 @@ narrow the reports. The rest belong to one command each:
 | --- | --- |
 | `--span week\|month\|year` | dashboard |
 | `--limit`, `--model`, `--grep` | `sessions` |
-| `--full`, `--costs`, `--follow`, `--compact`, `--export` | `view` |
 | `--window <tokens>` | `context` |
 | `--ascii` | everywhere but `sessions`, which prints no glyphs |
 

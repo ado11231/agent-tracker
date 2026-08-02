@@ -1,7 +1,7 @@
 {
   "name": "ccplus",
   "version": "0.1.0",
-  "description": "Token metrics and readable transcripts for Claude Code sessions",
+  "description": "Token metrics for Claude Code sessions",
   "keywords": [
     "claude",
     "claude-code",
@@ -9,7 +9,6 @@
     "tokens",
     "cost",
     "usage",
-    "transcript",
     "observability",
     "statusline"
   ],

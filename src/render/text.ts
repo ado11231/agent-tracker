@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import stringWidth from "string-width";
 
 // Wrapping works on plain text before any styling is applied, the
@@ -8,12 +9,24 @@ export function displayWidth(text: string): number {
   return stringWidth(text);
 }
 
-// The transcript column: the terminal, capped at 100 so long prose
-// stays readable in wide windows.
+// Report column width: the terminal, capped at 100 so long lines stay
+// readable in wide windows.
 export function contentWidth(
   columns: number | undefined = process.stdout.columns,
 ): number {
   return Math.min(columns ?? 80, 100);
+}
+
+// A path as the reader thinks of it: relative to the project it
+// belongs to, or against home when it sits outside. Shared by every
+// report that names a file from a session.
+export function shortenPath(path: string, cwd: string | undefined): string {
+  if (cwd !== undefined && path.startsWith(`${cwd}/`)) {
+    return path.slice(cwd.length + 1);
+  }
+  const home = homedir();
+  if (path.startsWith(`${home}/`)) return `~${path.slice(home.length)}`;
+  return path;
 }
 
 // Breaks one overlong word by display width, for tokens like urls

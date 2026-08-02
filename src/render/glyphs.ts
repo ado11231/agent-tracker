@@ -1,8 +1,8 @@
 import type { ToolCategory } from "../cost/tools.js";
 
-// The transcript's structural marks. Every mark has an ascii twin so
-// --ascii can swap the whole set at once, and the two sets share one
-// shape so a mark can never exist in only one of them.
+// Structural marks for reports and live panels. Every mark has an
+// ascii twin so --ascii can swap the whole set at once, and the two
+// sets share one shape so a mark can never exist in only one of them.
 
 export interface GlyphSet {
   user: string;

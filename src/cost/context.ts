@@ -76,8 +76,8 @@ export interface ContextConsumer {
   kind: ConsumerKind;
   // A path for files, a plain name for everything else.
   label: string;
-  // Set for file and tool rows, so the renderer can reuse the
-  // transcript's tool glyphs and hues.
+  // Set for file and tool rows, so the renderer can reuse the shared
+  // tool glyphs and hues.
   category: ToolCategory | undefined;
   // Tokens this row's logged text is worth on its own, before the
   // split is scaled to the measured growth. Kept so --json can show

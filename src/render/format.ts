@@ -61,15 +61,6 @@ export function fmtWhen(iso: string | undefined, now = new Date()): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-// Wall clock with seconds, for the compact live log where sub
-// minute cadence matters. fmtWhen stops at minutes on purpose.
-export function fmtClock(date: Date): string {
-  const h = String(date.getHours()).padStart(2, "0");
-  const m = String(date.getMinutes()).padStart(2, "0");
-  const s = String(date.getSeconds()).padStart(2, "0");
-  return `${h}:${m}:${s}`;
-}
-
 export function shortId(id: string | undefined): string {
   return id === undefined ? "????????" : id.slice(0, 8);
 }

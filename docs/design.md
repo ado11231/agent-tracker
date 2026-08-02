@@ -12,17 +12,17 @@ Each line is an event. The ones we care about:
 
 | Event | Key fields | Used for |
 |---|---|---|
-| user message | `message.content`, `timestamp` | transcript |
-| assistant message | `message.model`, `message.usage`, content blocks | transcript + metrics |
+| user message | `message.content`, `timestamp` | sessions `--grep`, context |
+| assistant message | `message.model`, `message.usage`, content blocks | metrics + context |
 | `usage` block | `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens` | cost math |
-| tool_use content block | `name`, `input` (Bash calls include `input.description`!) | transcript one-liners |
-| tool_result | output text, `is_error` | transcript (errors stay expanded) |
+| tool_use content block | `name`, `input` (Bash calls include `input.description`!) | tool cost split, context |
+| tool_result | output text, `is_error` | context fill estimate |
 | `type: "last-prompt"` | `leafUuid` | finding the active branch |
 | `isSidechain: true` | — | subagent attribution |
 
 **Critical structural fact:** messages form a **tree** via `parentUuid`
-(retries, branches, sidechains). Rendering or costing in raw line order is
-wrong. Resolve the active branch by walking backward from `leafUuid`.
+(retries, branches, sidechains). Costing in raw line order is wrong. Resolve
+the active branch by walking backward from `leafUuid`.
 
 **Critical costing fact (verified against real logs, CC ~2026-07):** one API
 response is written as **multiple `assistant` lines — one per content block —
@@ -147,74 +147,21 @@ Requirements:
   - **Tool stats** — call counts, failure rates per tool
   - **Time** — session duration, turn count, longest gaps
 
-## 4. Transcript renderer (module 3)
+## 4. Rendering (module 3)
 
-### Typography system — four channels, one job each
+Reports and live panels. Structure comes from spacing and glyphs; color and
+weight only reinforce. Every style must survive removal — `NO_COLOR`,
+`--no-color`, and piping to a file all read the same. `--ascii` swaps glyphs
+(`●◆⚡✎└` → `* > $ + \_`). Wrap at `min(terminal width, 100)`.
 
-| Channel | Options | Job |
-|---|---|---|
-| Color | 16-color default (theme-aware) | **who/what** — speaker & event identity |
-| Weight | bold / dim / normal | **importance** — read vs skim |
-| Style | italic, underline, inverse, strikethrough | **voice** — special text kinds |
-| Space | indent, blank lines, gutter glyphs, rules | **structure** — begin/end/nest |
+The transcript viewer (`view`, `--follow`, export) was cut: metrics and live
+context are the product. Glyph families and `toolPaint` remain because the
+dashboard and `context` still name tools the same way.
 
-### Per-event spec
+### Report coloring (2026-07-27)
 
-| Event | Treatment |
-|---|---|
-| User message | **bold + cyan**, `●` gutter, dim timestamp right of marker. Loudest thing on screen — these are the scan anchors. |
-| Claude prose | **unstyled default.** Body text is the baseline everything else is relative to. |
-| Thinking | dim + italic, collapsed to a `⋮ thinking (N lines)` label (the glyph already signals hidden content); full text only with `--full` |
-| Tool call | glyph per family (`⚡` bash, `✎` edit/write, `⌕` read/grep, `⛁` web), colored for the three common ones only (see the color code below), **description bold**, raw command dim on next line with `└` connector. Path labels truncate from the **front**, keeping the file name (`…/memory/phase-status.md`); prose/commands truncate from the end |
-| Tool result | dim, truncated ~3 lines; **errors: red, fully expanded** |
-| Cost/meta | dim badges at turn boundaries (`· 1.8k out · $0.04`); inverse-video chips in session header |
-| Separation | blank line between turns; dim `─` rule at session boundaries only; 2-space hanging indent so wraps clear the gutter |
-| Subagents | indent one level under their Task call |
-
-### Reference mockup (structure must read fine with zero styling)
-
-```
-─ session 3ab55ea1 ─  opus-4.8 · $0.42 · 14 turns · 6m
-
-● YOU                                              04:28
-  help me set the terminal title automatically
-
-◆ Claude
-  I'll check your shell config first.
-
-  ⚡ Check terminal app & shell config          $0.01
-     └ echo $TERM_PROGRAM; ls ~/.zshrc …
-  ✎ ~/.zshrc  (+3 −0)
-
-  ⋮ thinking (12 lines)
-
-  Done — your terminal now shows the session title.
-
-● YOU                                              04:31
-  nice, that worked
-```
-
-### Degradation ladder
-
-1. Full: truecolor + italic (feature-detected)
-2. Default: 16-color, no italic assumptions
-3. `NO_COLOR` / piped: styling stripped, structure carries everything
-4. `--ascii`: glyphs swapped for ASCII
-
-### Design principles
-
-- **Dim is the primary tool, not bold.** A transcript is ~80% machinery;
-  dimming machinery makes conversation pop without shouting. This holds for
-  the transcript only — see the opposite rule for the reports below.
-- **Every style must survive removal.**
-- Wrap at `min(terminal width, 100)`; use a string-width lib for
-  unicode/emoji correctness.
-
-### Report coloring (2026-07-27, the inverse of the transcript rule)
-
-The transcript dims machinery so the conversation pops. The reports have no
-machinery to hide: every line is a number someone asked for. Dimming there
-just made the whole screen grey, which is what prompted this.
+Every line in a report is a number someone asked for. Dimming there just made
+the whole screen grey, which is what prompted this.
 
 **Dim is chrome only.** It survives on three things, none of which are text:
 the heatmap's empty-day cells (they have to recede or the grid is noise), the
@@ -277,12 +224,10 @@ identical. There the models are passed ranked by spend, the biggest spender
 keeps the family hue, and each one after it takes the first hue still free.
 So the dominant model still looks like itself and the legend stays readable.
 
-**The transcript has four hues and more than four things worth marking**, so
-they go to what a reader scans for (`toolPaint`): cyan for your own prompts,
-then green ran something, magenta changed a file, blue read one. Web, mcp and
-agent calls keep their glyph and take no hue, since they are rare and giving
-them one would cost cyan the single job it has there. Nothing in a transcript
-is yellow, so a red line still means a call failed.
+**Tool categories** take three hues via `toolPaint`: green ran something,
+magenta changed a file, blue read one. Web, mcp and agent calls keep their
+glyph and take no hue. Cyan stays free for project labels. Nothing in a tool
+row is yellow or red — those two stay reserved for failure and attention.
 
 ## 5. CLI surface (v1 — frozen)
 
@@ -301,26 +246,23 @@ same two groups.
 ```
 Live:
 ccplus statusline         cost, context, and rate limit panel for statusLine
-ccplus context [id]       what is filling the context window right now
-ccplus watch [id]         tail a session, stream cost as it changes
-ccplus view --follow      the transcript, appended live as the session grows
+ccplus context [id]      what is filling the context window right now
 
 Reports:
 ccplus                    dashboard: today / week, per project & model
 ccplus sessions           recent sessions: cost, duration, turns, model
-ccplus view [id]          transcript (latest session if id omitted)
 ccplus doctor             parse health: skipped lines, unknown model IDs
 ```
 
-Two of those are features rather than commands and so cannot appear in a
-grouped command list: the bare `ccplus` dashboard, and `view --follow`. Both
-are covered by trailing help text instead.
+One of those is a feature rather than a command and so cannot appear in the
+grouped command list: the bare `ccplus` dashboard. It is covered by trailing
+help text instead.
 
 Commander orders help groups by **first registration**, so the live commands
 are declared first in `buildProgram`. Declaration order is load bearing;
 moving those blocks reorders the help. A test pins it.
 
-Phase 3 adds `view --markdown`; later, `find <query>`.
+Later, `find <query>`.
 
 #### `statusline`
 
@@ -329,7 +271,7 @@ assistant message and pipes session JSON on stdin (schema:
 code.claude.com/docs/en/statusline). The anchor field is
 `transcript_path` — it names the exact session file, so there is no guessing
 by mtime. We parse that file with the normal pipeline and print **ccplus's
-own** cost, so the number matches `view` and the dashboard rather than echoing
+own** cost, so the number matches the dashboard rather than echoing
 Claude Code's `cost.total_cost_usd`. Run from a shell with no piped input it
 falls back to the newest session, which makes it previewable.
 
@@ -386,7 +328,7 @@ still leads with a gauge rather than a lone number.
 `ctx` is the input side of the most recent main-thread API call (fresh input +
 cache reads + cache writes, output excluded — the same basis as Claude Code's
 `used_percentage`). The **token count is ccplus's own** so it agrees with
-`view` and the dashboard; only the **window size** is taken from the session
+the dashboard; only the **window size** is taken from the session
 JSON (`context_window.context_window_size`). On a manual run no size is sent,
 so one is inferred: context above 200k proves the extended tier, and assuming
 the small window there would report a false red 100%. The gauge row drops
@@ -504,86 +446,6 @@ a count. That count is the actionable finding: each read puts the same bytes
 in the window again. Everything else groups by `toolCategory`, since one bash
 call does not deserve a row.
 
-#### `watch`
-
-Tails one session and streams its cost as it changes. An **append log**, not a
-redraw-in-place panel: it prints the same one-line format as `statusline`,
-stamped with a wall clock, each time the numbers actually move. That keeps it
-live in a terminal and still a clean cost log when redirected to a file —
-which cursor tricks would not survive. The header (`watching <file> — ctrl-c
-to stop`) goes to stderr so a redirect of stdout captures only the cost lines.
-
-```
-10:32:15  opus-4-8 · $0.19 · +$0.04 · 27.8k ctx · 2 turns
-```
-
-The `+$0.04` is the cost added since the last line printed, sitting next to
-the total so a scan down the log reads as both a running total and the price
-of each turn. It is omitted on the first line, when a model has no pricing,
-and when the change is too small to move the printed total — a `+$0.00` would
-read as a bug rather than as free.
-
-The delta forces the tick to render **twice**. Change detection compares the
-line *without* the delta; the printed line has it spliced in. Folding the
-delta into the compared text would make an unchanged session differ from the
-stored line on every tick and print forever. Hence `sessionSnapshot` returns
-the summary and the undecorated text rather than one string.
-
-Rate limits deliberately do **not** appear here. `rate_limits` arrives only on
-the statusline's stdin JSON; `watch` is a standalone command tailing a file
-with no Claude Code process feeding it, and inventing a state file to carry
-the number across would break the read-only and no-state constraints.
-
-It follows the session resolved at startup for the whole run: the newest one
-with a conversation, or the `[id]` prefix given (same matching as `view`:
-ambiguous exits 1, no match exits 2). The file is polled once a second; a
-change re-parses the whole file (the streaming reader drops any half-written
-trailing line, so a mid-append snapshot is safe) and prints only when the cost
-line differs from the last — the clock is excluded from that comparison, so an
-unchanged session stays quiet however often the file is touched.
-
-#### `view --follow`
-
-The organized chat, pointed at a session that is still being written. It
-renders what exists, then appends turns as they arrive, so a split pane beside
-`claude` shows the conversation in the readable form instead of the TUI's.
-(Rendering *inside* Claude Code is not possible — it owns its TUI, and
-`statusLine` is the only extension point.)
-
-Like `watch`, it is an **append log**: a printed line is final, nothing is ever
-redrawn. That constraint decides the whole design, because three things in a
-static render mutate after the fact:
-
-- **Unfinished tool calls.** The log is appended in causal order, but a message
-  with parallel calls writes both calls before either result, while the
-  renderer draws each result under its own call. So each pass emits only the
-  *settled* prefix: all turns but the last, plus the last turn's items up to
-  the first call still waiting on its result. Earlier turns are settled whole —
-  a call interrupted in a finished turn will never resolve, and waiting on it
-  would freeze the stream.
-- **The turn cost badge.** A turn's cost is not known until the turn ends, so
-  the badge moves off the Claude anchor onto a **closing line**, right-aligned
-  and dim, printed when the turn settles. A badge on the anchor would sit on
-  screen reading `$0.03` for a turn that ends at `$0.40`.
-- **The clock and the terminal width.** Both are read once at startup; a
-  relative timestamp that ticks would silently rewrite a printed line.
-
-The header follows the same honesty rule: it opens with identity only
-(`── session 52e94664 ──  opus-4-8 · live`) and the totals are printed as a
-closing line when the stream ends, where they are finally true.
-
-Each pass renders the settled transcript and prints whatever is past the end
-of the previous render. That render is *almost* a monotone function of the
-log, not quite: the tree resolver extends the branch forward past the leaf,
-guessing that the newest sibling wins, and a later `last-prompt` line can name
-a leaf on the other side of a fork. When the new render is not an extension of
-what is on screen, the honest move is the only one available — say so
-(`… transcript changed, lines above are stale`) and print the branch that won.
-Measured against a replayed real session this fires on under 5% of passes.
-
-`--json` is not supported with `--follow` yet (exit 2); the natural shape is
-NDJSON, one object per settled turn.
-
 ### Flags
 
 Shared, though not every command registers every one — commander scopes
@@ -594,26 +456,20 @@ options per command, and a command only takes a flag it actually reads:
 | `--json` | machine-readable output | all |
 | `--no-color` | strip styling (also triggered by `NO_COLOR` env and pipe detection) | all |
 | `--ascii` | glyphs `●◆⚡✎└` → `* > $ + \_` (CI logs, exotic terminals) | all but `sessions` |
-| `--project <path>` | scope to one project (default: all) | all but `view`, `statusline` |
+| `--project <path>` | scope to one project (default: all) | all but `statusline` |
 | `--since <date>` / `--until <date>` | time window for metrics | dashboard, `sessions` |
 
 `--ascii` goes on every command that prints a glyph, which is every one but
 `sessions` — the only report already inside ascii. That includes `doctor`,
-whose sole glyph is the `·` in its header, and the `view --follow --compact`
-log, whose sole glyph is the `·` between its fields. A flag that swaps glyphs
-has to swap all of them or it is not worth having.
-
-`view` only: `--full` (expand raw commands, tool outputs, thinking),
-`--costs` (per-message cost badges), `-f/--follow` (keep appending turns as
-the session grows), `--compact` (with `--follow`, a cost log instead),
-`--export [path]` (write markdown, defaulting to `./<shortid>.md`).
+whose sole glyph is the `·` that separates its header and verdict fields. A
+flag that swaps glyphs has to swap all of them or it is not worth having.
 
 `sessions` only: `--limit <n>` (default 20, 0 shows all), `--model <text>`,
 `--grep <text>`.
 
 `context` only: `--window <tokens>`, for when the inferred window size is
-wrong. Both `view` and `context` take an optional `[id]` argument, an
-unambiguous session id prefix, defaulting to the newest session.
+wrong. `context` takes an optional `[id]` argument, an unambiguous session
+id prefix, defaulting to the newest session.
 
 Dashboard (bare `ccplus`) only: `--span week|month|year`, a single ladder
 where each rung keeps what the one below showed. `week` (the default) is
@@ -701,38 +557,34 @@ Four blocks, in the order the questions get asked:
 
 Within a table, color marks the row's **name** and its **share bar** only,
 never the raw numbers between them. Model rows take the hue the heatmap legend
-assigned that model, and tool rows take the hue the tool wears in a transcript,
+assigned that model, and tool rows take the hue the tool wears in `context`,
 so a color always means the same thing across commands.
 
-**Flag surface (audited 2026-08-01):** 16 distinct flags over 5 commands plus
+**Flag surface (audited 2026-08-01):** 11 distinct flags over 4 commands plus
 the bare dashboard. Six are shared (`--json`, `--no-color`, `--ascii`,
-`--project`, `--since`, `--until`); the other ten belong to one command each
-— five on `view`, three on `sessions`, `--window` on `context`, `--span` on
-the dashboard. Three were folded away in the pass that cut the over built
-features: `--year` and `--month` became `--span`, `-o` was absorbed into
-`--export [path]`, and `--no-full` went with the rule that an export always
-expands, since it is read later by someone who cannot rerun it.
+`--project`, `--since`, `--until`); the other five belong to one command each
+— three on `sessions`, `--window` on `context`, `--span` on the dashboard.
+`view` and its five flags (`--full`, `--costs`, `--follow`, `--compact`,
+`--export`) were cut with the transcript viewer. Earlier, `--year` and
+`--month` became `--span`.
 
 ### UX rules
 
 - `-h` output fits one screen. No pager, no walls.
-- `view` with no args renders the latest session immediately.
 - Unknown model in logs → tokens shown, cost column reads `?`, one dim
   footnote pointing at `doctor`. Never a crash, never a zero passed off as
   a real cost.
 - Exit codes: 0 ok, 1 bad input (an unparseable date, a `--limit` that is not
   a count, an unknown option), 2 nothing to work with (no sessions found, no
-  session matching an id) or a mode that does not combine (`--compact`
-  without `--follow`, `--export` with it, `--json` with `--compact`).
-  Verified across every command 2026-08-01.
-- Session IDs accept unambiguous prefixes (`view 3ab5`).
+  session matching an id). Verified across every command 2026-08-01.
+- Session IDs accept unambiguous prefixes (`context 3ab5`).
 
 ### README images (2026-08-01)
 
-`npm run record` renders every image in the README, and `npm run record view`
-renders one. Needs `brew install vhs`. The tapes are checked in at
-`docs/tapes/*.tape`, so an image can be rebuilt when the output it shows
-changes, rather than quietly going stale.
+`npm run record` renders every image in the README, and
+`npm run record context` renders one. Needs `brew install vhs`. The tapes are
+checked in at `docs/tapes/*.tape`, so an image can be rebuilt when the output
+it shows changes, rather than quietly going stale.
 
 **Nothing is recorded against `~/.claude/projects`.** A README image built
 from real logs puts real project names, real file paths and real prompts on a
@@ -740,19 +592,14 @@ public page. Scrubbed fixtures do not work either: every string in them is a
 placeholder, so the screenshots would read as nonsense. So
 `scripts/demo-sessions.mjs` invents a set of sessions in the real log shape —
 four projects, a year of activity for the contribution graph, and one hand
-written session about a double applied discount code that the `context` and
-`view` images are both taken from.
+written session about a double applied discount code that the `context` image
+is taken from.
 
 ccplus finds them through `CCPLUS_ROOT`, the one env var it reads. That is an
 escape hatch and not configuration: there is nothing to set for normal use and
 no file anywhere remembers it. `scripts/record.sh` puts a shim named `ccplus`
 on PATH that pins the variable, so a tape typing `ccplus context` cannot reach
 real logs even if it is run by hand.
-
-`follow.gif` is the one image that has to move, since a still frame of a live
-transcript is just a transcript. `scripts/demo-grow.mjs` writes a session one
-turn at a time in the background while VHS records, and follow with no id
-lands on it because it is the newest file in the root.
 
 **The hero gif is the exception to all of the above.** A recording of a real
 Claude Code session running beside the statusline cannot be a tape, because
@@ -772,6 +619,6 @@ backgrounds and wrecks the compression.
 
 ## 6. Explicitly out of scope (v1)
 
-Model rerouting (cut permanently — see CLAUDE.md), LLM calls of any kind,
-config files, daemons/alerts, non-Claude-Code log formats, TUI, HTML export
-(markdown export is Phase 3; HTML maybe later).
+Model rerouting (cut permanently — see CLAUDE.md), the transcript viewer,
+LLM calls of any kind, config files, daemons/alerts, non-Claude-Code log
+formats, TUI, HTML/markdown export.

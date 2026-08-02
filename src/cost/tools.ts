@@ -5,8 +5,8 @@ import type {
 } from "../parser/events.js";
 import { costOfUsage } from "./cost.js";
 
-// Buckets match the viewer's glyph families. chat is the bucket for
-// api messages that invoked no tool at all.
+// Buckets match the glyph families used in reports. chat is the bucket
+// for api messages that invoked no tool at all.
 export type ToolCategory =
   | "bash"
   | "edit"

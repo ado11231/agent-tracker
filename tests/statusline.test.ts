@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   emptyRollup,
   type SessionSummary,
-  type TurnDelta,
 } from "../src/cost/aggregate.js";
 import {
   panelWidth,
@@ -17,7 +16,6 @@ import { makeStyle } from "../src/render/style.js";
 import {
   currentContext,
   statuslinePanel,
-  statuslineText,
 } from "../src/render/live.js";
 import { parseSessionFile } from "../src/parser/session.js";
 import {
@@ -89,79 +87,6 @@ async function makeRoot(): Promise<string> {
   await utimes(newer, now, now);
   return root;
 }
-
-describe("statuslineText", () => {
-  it("joins model, cost, context, and turns", () => {
-    const s = summary({ total: { ...emptyRollup(), usd: 1.24 } });
-    const line = statuslineText(s, {
-      tokens: 27800,
-      model: "claude-opus-4-8",
-    });
-    expect(line).toBe("opus-4-8 · $1.24 · 27.8k ctx · 3 turns");
-  });
-
-  it("singularizes a lone turn", () => {
-    const s = summary({ turns: 1, total: { ...emptyRollup(), usd: 0.1 } });
-    expect(statuslineText(s, { tokens: 0, model: undefined })).toContain(
-      "1 turn",
-    );
-    expect(statuslineText(s, { tokens: 0, model: undefined })).not.toContain(
-      "turns",
-    );
-  });
-
-  it("marks cost unknown when a model has no pricing", () => {
-    const s = summary({
-      total: { ...emptyRollup(), usd: 0, unknownModels: ["mystery"] },
-    });
-    expect(statuslineText(s, { tokens: 100, model: "mystery" })).toContain("$?");
-  });
-
-  it("omits the context segment when nothing has been sent yet", () => {
-    const line = statuslineText(summary(), { tokens: 0, model: undefined });
-    expect(line).not.toContain("ctx");
-  });
-
-  it("falls back to the session's model when context has none", () => {
-    const line = statuslineText(summary(), { tokens: 5, model: undefined });
-    expect(line).toContain("opus-4-8");
-  });
-
-  // What turnDelta hands the renderer: only the fields it reads.
-  function delta(usd: number | undefined): TurnDelta {
-    return { usd, tokens: emptyRollup().tokens, messages: 1 };
-  }
-
-  it("puts the cost delta next to the total", () => {
-    const s = summary({ total: { ...emptyRollup(), usd: 0.23 } });
-    const line = statuslineText(
-      s,
-      { tokens: 27800, model: "claude-opus-4-8" },
-      delta(0.04),
-    );
-    expect(line).toBe("opus-4-8 · $0.23 · +$0.04 · 27.8k ctx · 3 turns");
-  });
-
-  it("omits the delta on the first line and when the cost is unknown", () => {
-    const s = summary({ total: { ...emptyRollup(), usd: 0.23 } });
-    expect(statuslineText(s, { tokens: 1, model: undefined })).not.toContain("+$");
-    const unknown = summary({
-      total: { ...emptyRollup(), usd: 0, unknownModels: ["mystery"] },
-    });
-    expect(
-      statuslineText(unknown, { tokens: 1, model: undefined }, delta(0.04)),
-    ).not.toContain("+$");
-  });
-
-  // A change too small to move the printed total would render as
-  // "+$0.00", which reads as a bug rather than as free.
-  it("omits a delta smaller than the printed total can show", () => {
-    const s = summary({ total: { ...emptyRollup(), usd: 0.1901 } });
-    expect(
-      statuslineText(s, { tokens: 1, model: undefined }, delta(0.0001)),
-    ).not.toContain("+$");
-  });
-});
 
 describe("statuslinePanel", () => {
   function panel(

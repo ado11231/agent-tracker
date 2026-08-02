@@ -43,7 +43,7 @@ mkdir -p docs/images
 
 wanted=("$@")
 if [ ${#wanted[@]} -eq 0 ]; then
-  wanted=(dashboard context view statusline follow)
+  wanted=(dashboard context statusline)
 fi
 
 for name in "${wanted[@]}"; do
@@ -53,23 +53,8 @@ for name in "${wanted[@]}"; do
     exit 1
   fi
 
-  # The follow gif needs a session that is actually growing while it
-  # records, so the writer runs alongside vhs and is cleaned up after.
-  grower=""
-  if [ "$name" = "follow" ]; then
-    node scripts/demo-grow.mjs "$DEMO" 2.4 &
-    grower=$!
-    # Let the first turn land so follow has something to open with.
-    sleep 1
-  fi
-
   echo "recording $name..."
   vhs "$tape"
-
-  if [ -n "$grower" ]; then
-    kill "$grower" 2>/dev/null || true
-    wait "$grower" 2>/dev/null || true
-  fi
 done
 
 echo "done. images are in docs/images/"

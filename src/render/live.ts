@@ -2,7 +2,6 @@ import {
   burnRatePerHour,
   cacheHitRatio,
   type SessionSummary,
-  type TurnDelta,
 } from "../cost/aggregate.js";
 import type { ExtractedSession } from "../parser/events.js";
 import { emptyHostFacts, type HostFacts } from "../parser/host.js";
@@ -12,11 +11,8 @@ import { modelPaint, roles, type Paint } from "./palette.js";
 import type { Style } from "./style.js";
 import { displayWidth } from "./text.js";
 
-// Shared one-line renderer for the live surfaces: the statusline
-// (printed once per assistant message by Claude Code) and the compact
-// follow log (appended whenever a tailed session changes). Plain text on
-// purpose, both surfaces stream to stdout and the line has to read
-// with no styling.
+// Live surface renderers for the statusline panel Claude Code prints
+// after each assistant message.
 
 // The live context window fill and the model behind it, taken from
 // the most recent api call on the main thread. Matches Claude Code's
@@ -76,7 +72,7 @@ export interface PanelOptions {
   g: GlyphSet;
   // Total context window for the current model, from the session json
   // Claude Code pipes in. Only the size is taken from there; the token
-  // count stays ccplus's own so it agrees with view and the dashboard.
+  // count stays ccplus's own so it agrees with the dashboard.
   contextWindow: number;
   // Everything else the host told us about the live session. Defaults
   // to all absent, which is what a manual run from a shell gets.
@@ -350,41 +346,4 @@ export function statuslinePanel(
   const limits = limitsRow(summary, options, host);
   if (limits !== undefined) rows.push(limits);
   return rows.map((row) => fitRow(row, options.width));
-}
-
-// model · $cost · +$delta · <ctx> ctx · <turns> turns. Cost is
-// ccplus's own number so it matches view and the dashboard; it reads
-// $? when any model in the session has no pricing. The context segment
-// drops out before the first api call. Kept plain and on one line for
-// the compact append log, which pipes to a file.
-//
-// delta is what moved since the last line the compact log printed.
-// It sits next to the total so a scan down the log reads as both a
-// running total and the price of each turn. It is omitted on the first
-// line, when the cost is unknown, and when nothing was added, so a
-// delta in the log always means real money moved.
-export function statuslineText(
-  summary: SessionSummary,
-  context: CurrentContext,
-  change?: TurnDelta,
-  // The separator, so --ascii reaches the compact log the same as it
-  // reaches every other rendered surface. Defaults to the unicode dot.
-  dot = "·",
-): string {
-  const model = context.model ?? summary.models[summary.models.length - 1];
-  const known = summary.total.unknownModels.length === 0;
-  const delta = change?.usd;
-  const segments = [
-    model === undefined ? undefined : shortModel(model),
-    known ? fmtUsd(summary.total.usd) : "$?",
-    // Rounded to the same two decimals as the total, so a delta only
-    // shows when it moves the printed number. Gated on known too: a
-    // total reading $? must never sit beside a precise looking delta.
-    known && delta !== undefined && delta >= 0.005
-      ? `+${fmtUsd(delta)}`
-      : undefined,
-    context.tokens > 0 ? `${fmtTokens(context.tokens)} ctx` : undefined,
-    `${summary.turns} ${summary.turns === 1 ? "turn" : "turns"}`,
-  ].filter((seg): seg is string => seg !== undefined);
-  return segments.join(` ${dot} `);
 }

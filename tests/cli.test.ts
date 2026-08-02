@@ -5,19 +5,7 @@ describe("cli scaffold", () => {
   it("registers the v1 commands", () => {
     const program = buildProgram();
     const names = program.commands.map((command) => command.name());
-    expect(names).toEqual(["statusline", "context", "sessions", "view", "doctor"]);
-  });
-
-  it("names the live modes of view in the help", () => {
-    const program = buildProgram();
-    let help = "";
-    program.configureOutput({
-      writeOut: (chunk) => {
-        help += chunk;
-      },
-    });
-    program.outputHelp();
-    expect(help).toContain("--compact");
+    expect(names).toEqual(["statusline", "context", "sessions", "doctor"]);
   });
 
   // Commands are grouped in --help by what they are for, and commander
@@ -34,14 +22,13 @@ describe("cli scaffold", () => {
       ["statusline", "Live:"],
       ["context", "Live:"],
       ["sessions", "Reports:"],
-      ["view", "Reports:"],
       ["doctor", "Reports:"],
     ]);
   });
 
-  // The dashboard and view --follow are features without a command of
-  // their own, so the grouped list cannot mention them.
-  it("documents the two features that are not commands", () => {
+  // The dashboard is a feature without a command of its own, so the
+  // grouped list cannot mention it.
+  it("documents the bare dashboard feature", () => {
     // Via outputHelp, not helpInformation: the trailing text is added
     // by an addHelpText hook, which only the former runs.
     const program = buildProgram();
@@ -55,7 +42,6 @@ describe("cli scaffold", () => {
     expect(help).toContain("Live:");
     expect(help).toContain("Reports:");
     expect(help).toContain("Run with no command for the dashboard");
-    expect(help).toContain("view --follow");
   });
 
   it("is named ccplus", () => {

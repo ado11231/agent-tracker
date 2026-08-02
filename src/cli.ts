@@ -9,7 +9,6 @@ import { runContext } from "./commands/context.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runSessions } from "./commands/sessions.js";
 import { runStatusline } from "./commands/statusline.js";
-import { runView } from "./commands/view.js";
 import type { CommandFlags } from "./commands/load.js";
 
 // Help group headings. Live commands run beside a session in
@@ -28,11 +27,6 @@ interface RawOpts {
   limit?: string;
   model?: string;
   grep?: string;
-  full?: boolean;
-  costs?: boolean;
-  follow?: boolean;
-  compact?: boolean;
-  export?: boolean | string;
   span?: DashboardSpan;
   window?: string;
 }
@@ -57,7 +51,7 @@ function withCommonFlags(command: Command): Command {
 }
 
 // The report scan narrowing flags. Only the commands that actually
-// consult loadSessions' time/cwd window take these, so view, doctor
+// consult loadSessions' time/cwd window take these, so doctor
 // (except --project) and statusline do not. --ascii is not here
 // either: it is registered per-command on the ones whose render uses
 // glyphs, which is every command but sessions — the only report that
@@ -74,9 +68,7 @@ export function buildProgram(): Command {
 
   program
     .name("ccplus")
-    .description(
-      "Token metrics and readable transcripts for Claude Code sessions",
-    )
+    .description("Token metrics for Claude Code sessions")
     .version(version);
 
   // Commands are grouped in --help by what they are for: the ones you
@@ -140,35 +132,6 @@ export function buildProgram(): Command {
       });
     });
 
-  withCommonFlags(program.command("view"))
-    .option("--ascii", "swap unicode glyphs for ascii")
-    .helpGroup(REPORTS)
-    .description("Render a session transcript, latest session if id omitted")
-    .argument("[id]", "session id, unambiguous prefixes accepted")
-    .option("--full", "expand raw commands, tool outputs, and thinking")
-    .option("--costs", "per call cost badges on tool lines")
-    .option("-f, --follow", "keep appending turns as the session grows")
-    .option("--compact", "with --follow, a cost log instead of the transcript")
-    // The path is optional, so --export alone writes ./<id>.md and
-    // --export <path> writes there. One flag instead of a flag plus a
-    // second one that only ever meant anything alongside it. An export
-    // always expands: it is read later, with nobody around to rerun it.
-    .option("--export [path]", "write the transcript to a markdown file (always expanded)")
-    .action(async (id: string | undefined, _opts: RawOpts, command: Command) => {
-      const opts = command.optsWithGlobals() as RawOpts;
-      const exportAs = opts.export !== undefined && opts.export !== false;
-      process.exitCode = await runView({
-        ...toFlags(opts),
-        id,
-        full: opts.full === true || exportAs,
-        costs: opts.costs === true,
-        follow: opts.follow === true,
-        compact: opts.compact === true,
-        exportAs,
-        out: typeof opts.export === "string" ? opts.export : undefined,
-      });
-    });
-
   withCommonFlags(program.command("doctor"))
     .option("--project <path>", "only sessions from this project directory")
     .option("--ascii", "swap unicode glyphs for ascii")
@@ -198,8 +161,8 @@ export function buildProgram(): Command {
       });
     });
 
-  // The two features that are not commands, so the grouped list above
-  // cannot mention them: the bare dashboard and view's live mode.
+  // The one feature that is not a command, so the grouped list above
+  // cannot mention it: the bare dashboard.
   program.addHelpText(
     "after",
     [
@@ -208,10 +171,6 @@ export function buildProgram(): Command {
       "totals by project, model and tool. --span month widens the two",
       "summary rows, and --span year adds a contribution graph of daily",
       "cost, each day colored by the model that spent the most on it.",
-      "",
-      "view --follow is the live form of view. It renders the session so",
-      "far, then appends turns as they arrive. Add --compact for a cost",
-      "log instead: one timestamped line each time the numbers move.",
     ].join("\n"),
   );
 

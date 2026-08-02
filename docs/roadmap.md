@@ -36,14 +36,11 @@ Each phase ships something usable on its own.
 - Deferred to the polish pass: interruption notices ("[Request interrupted
   by user]") currently count as turns; decide whether they should.
 
-## Phase 2 — Transcript viewer
+## Phase 2 — Transcript viewer (cut 2026-08-01)
 
-- `view [id]` (defaults to latest), `--full`
-- Full typography spec from design.md: gutter glyphs, bold descriptions over
-  dimmed commands, dim/italic thinking, red expanded errors, cost badges
-- Degradation ladder: 16-color default, `NO_COLOR`, pipe detection, `--ascii`
-- **Done when:** a stranger can read a session and follow what happened
-  without expanding anything.
+Shipped, then removed: `view`, `--follow`, `--compact`, export, and the
+transcript renderer. Metrics plus live `statusline` / `context` are the
+product; a session dump diluted that. See CLAUDE.md.
 
 ## Phase 3 — Polish
 

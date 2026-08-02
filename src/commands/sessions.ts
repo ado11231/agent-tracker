@@ -68,8 +68,7 @@ function promptMatch(
   return undefined;
 }
 
-// Newest first. The reason to list sessions is to find a recent one,
-// and the short id in the first column is what view takes from here.
+// Newest first. The reason to list sessions is to find a recent one.
 function lastActivity(row: Row): number {
   const time = new Date(row.session.summary.lastTimestamp ?? 0).getTime();
   return Number.isNaN(time) ? 0 : time;

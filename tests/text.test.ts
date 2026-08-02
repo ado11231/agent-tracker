@@ -4,6 +4,7 @@ import { supportsItalic, supportsTruecolor } from "../src/render/style.js";
 import {
   contentWidth,
   displayWidth,
+  shortenPath,
   truncate,
   truncatePath,
   wrapPlain,
@@ -102,6 +103,28 @@ describe("truncatePath", () => {
     expect(out.startsWith("…")).toBe(true);
     expect(out).not.toContain("/");
     expect(displayWidth(out)).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("shortenPath", () => {
+  it("strips the project cwd prefix", () => {
+    expect(shortenPath("/Users/you/code/app/src/a.ts", "/Users/you/code/app")).toBe(
+      "src/a.ts",
+    );
+  });
+
+  it("falls back to a home-relative path outside the project", () => {
+    const home = process.env.HOME ?? "";
+    expect(home.length).toBeGreaterThan(0);
+    expect(shortenPath(`${home}/.claude/settings.json`, "/tmp/other")).toBe(
+      "~/.claude/settings.json",
+    );
+  });
+
+  it("leaves unrelated absolute paths alone", () => {
+    expect(shortenPath("/var/log/system.log", "/Users/you/code")).toBe(
+      "/var/log/system.log",
+    );
   });
 });
 

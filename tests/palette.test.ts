@@ -5,7 +5,6 @@ import {
   modelPaint,
   roles,
   toolPaint,
-  userPaint,
 } from "../src/render/palette.js";
 import { makeStyle } from "../src/render/style.js";
 
@@ -164,16 +163,15 @@ describe("toolPaint", () => {
     expect(new Set(hues).size).toBe(3);
   });
 
-  it("keeps red and yellow out of the transcript glyphs", () => {
+  it("keeps red and yellow out of the tool glyphs", () => {
     for (const kind of ["bash", "edit", "read", "web", "mcp", "agents", "other"]) {
       expect([RED, YELLOW]).not.toContain(hueOf(toolPaint(c, kind)));
     }
   });
 
-  it("leaves cyan to the user anchor", () => {
+  it("leaves cyan free for project and prompt labels", () => {
     for (const kind of ["bash", "edit", "read", "web", "mcp", "agents", "other"]) {
       expect(hueOf(toolPaint(c, kind))).not.toBe(CYAN);
     }
-    expect(userPaint(c)("you")).toContain("[36m");
   });
 });
