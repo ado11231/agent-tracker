@@ -1,2 +1,6 @@
 node_modules/
 dist/
+
+# Generated demo sessions for the README images. Rebuilt by
+# scripts/demo-sessions.mjs, never committed.
+.demo/

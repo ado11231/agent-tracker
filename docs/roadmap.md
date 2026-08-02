@@ -149,18 +149,46 @@ commands on the side. One binary, four integration surfaces.
 - **Done when:** the help fits one screen, the merged follow modes behave the
   same as the commands they replace, and the new flags have tests.
 
-### P2. `ccplus context [id]`
+### P2. `ccplus context [id]` (shipped 2026-08-01)
 
 Answers "what is filling the context window right now". Attributes active
-branch tokens by origin: prompt overhead, file reads grouped per path, tool
-output by category, and conversation. Shows the window fill, then the top ten
-consumers with tokens, share of the window, and a bar. Files read more than
-once are flagged. Where the log only gives text, the count is estimated and
-marked with `~`, never presented as exact. `--json` and an optional `--watch`.
-`view --follow` picks up a one line context summary when fill crosses 50, 80,
-and 90 percent.
+branch tokens by origin: file reads grouped per path, tool output by category,
+your prompts, and assistant replies. Shows the window fill, then the top
+consumers with tokens, share of the window, and how many times each file was
+touched. Where the log only gives text the number is estimated and marked with
+`~`, never presented as exact. `--json` and `--window <tokens>`.
 
 This is the feature that makes people pick ccplus over a pure cost reporter.
+
+Built as specced with four changes, all forced by what the logs actually hold.
+The full write up is in docs/design.md; the short version:
+
+- **The split divides rather than converts.** Characters times a constant
+  gives a total that matches nothing. Splitting the *measured* growth between
+  origins in proportion to weighted characters makes the parts sum to a number
+  you can check against the statusline, and reduces the claim to relative
+  share. Calibrated over 43 real sessions: 2.0 characters per token for tool
+  output, 2.3 for prose, 1.9 for tool inputs. Not 4.
+- **Startup is measured, not modelled.** The first request's context size is
+  the system prompt plus tool definitions, 22k to 32k tokens with a median of
+  28k. That is a quarter of a default window before anyone types, so it gets
+  its own exact line above the estimated split.
+- **Compaction had to be handled, not just flagged.** The boundary line
+  carries `preTokens`/`postTokens`, and everything before it left the window.
+  Ignoring that overstated the one compacted local session by 4x. Its
+  `postTokens` becomes the baseline and only later events are attributed.
+- **No bar column, no `--watch`.** The share column already does what a bar
+  would, in a report that is mostly a table of paths, and `--watch` on a
+  breakdown that moves once per turn is a rerun rather than a mode.
+
+Still open from the original spec: the one line context summary in
+`view --follow` when fill crosses 50, 80 and 90 percent. That belongs with the
+P3 hook work, which computes the same crossings.
+
+Gap found while building, not fixed: thinking blocks are written to the log
+with their text stripped, all 2,719 of them across 45 local sessions. The
+viewer's collapsed "thinking (N lines)" therefore has nothing to count against
+real logs, and should be checked.
 
 ### P3. Hooks
 

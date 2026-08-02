@@ -101,8 +101,10 @@ const CACHE_GOOD = 0.8;
 // are structure and should recede.
 
 // Fuller is worse: context filling toward compaction, quota burning
-// toward a cutoff.
-function fillPaint(c: Style, ratio: number): Paint {
+// toward a cutoff. Exported because the context report draws the same
+// gauge for the same quantity, and a window that reads yellow on the
+// statusline has to read yellow there too.
+export function fillPaint(c: Style, ratio: number): Paint {
   const r = roles(c);
   return ratio >= GAUGE_DANGER ? r.danger : ratio >= GAUGE_WARN ? r.warn : r.ok;
 }
@@ -115,7 +117,7 @@ function cachePaint(c: Style, ratio: number): Paint {
   return ratio >= CACHE_GOOD ? r.ok : ratio >= CACHE_POOR ? r.warn : r.danger;
 }
 
-function bar(ratio: number, g: GlyphSet): string {
+export function bar(ratio: number, g: GlyphSet): string {
   // Always show at least one filled cell once anything is used, so a
   // low percentage still reads as started rather than empty.
   const filled = Math.min(

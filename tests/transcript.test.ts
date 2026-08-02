@@ -85,6 +85,7 @@ function session(
       firstTimestamp: undefined,
       lastTimestamp: undefined,
       models: [],
+      compaction: undefined,
     },
     events,
     sidechains,

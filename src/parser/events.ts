@@ -76,6 +76,19 @@ export type SessionEvent =
   | ToolCallEvent
   | ToolResultEvent;
 
+// What Claude Code recorded when it compacted the conversation. The
+// window was rebuilt from a summary at that point, so anything read
+// from before it describes a context that no longer exists.
+export interface Compaction {
+  // "manual" when the user ran /compact, "auto" when the window
+  // filled up.
+  trigger: string | undefined;
+  // Window size either side of the rebuild.
+  preTokens: number;
+  postTokens: number;
+  timestamp: string | undefined;
+}
+
 export interface SessionMeta {
   sessionId: string | undefined;
   version: string | undefined;
@@ -85,6 +98,9 @@ export interface SessionMeta {
   lastTimestamp: string | undefined;
   // Distinct real models seen, synthetic placeholder excluded.
   models: string[];
+  // The last compaction on the active branch, if the session was ever
+  // compacted. Undefined is the common case by a wide margin.
+  compaction: Compaction | undefined;
 }
 
 export interface ExtractStats {
@@ -275,6 +291,23 @@ function extractEvents(
   return events;
 }
 
+// Claude Code marks a compaction with a system line carrying the
+// before and after window sizes. Only the last one matters: an
+// earlier rebuild has already been folded into the one after it.
+function readCompaction(line: RawLine): Compaction | undefined {
+  if (line.type !== "system" || line.data.subtype !== "compact_boundary") {
+    return undefined;
+  }
+  const detail = asRecord(line.data.compactMetadata);
+  if (detail === undefined) return undefined;
+  return {
+    trigger: asString(detail.trigger),
+    preTokens: asNumber(detail.preTokens),
+    postTokens: asNumber(detail.postTokens),
+    timestamp: line.timestamp,
+  };
+}
+
 function extractMeta(
   branch: RawLine[],
   ledger: Map<string, MessageUsage>,
@@ -287,12 +320,14 @@ function extractMeta(
     firstTimestamp: undefined,
     lastTimestamp: undefined,
     models: [],
+    compaction: undefined,
   };
   for (const line of branch) {
     meta.sessionId ??= asString(line.data.sessionId);
     meta.version ??= asString(line.data.version);
     meta.cwd ??= asString(line.data.cwd);
     meta.gitBranch ??= asString(line.data.gitBranch);
+    meta.compaction = readCompaction(line) ?? meta.compaction;
     if (line.timestamp !== undefined) {
       meta.firstTimestamp ??= line.timestamp;
       meta.lastTimestamp = line.timestamp;

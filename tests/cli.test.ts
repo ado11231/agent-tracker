@@ -5,7 +5,7 @@ describe("cli scaffold", () => {
   it("registers the v1 commands", () => {
     const program = buildProgram();
     const names = program.commands.map((command) => command.name());
-    expect(names).toEqual(["statusline", "sessions", "view", "doctor"]);
+    expect(names).toEqual(["statusline", "context", "sessions", "view", "doctor"]);
   });
 
   it("names the live modes of view in the help", () => {
@@ -32,6 +32,7 @@ describe("cli scaffold", () => {
     // The hidden alias carries no group, so it drops out here.
     expect(groups.filter(([, group]) => group !== "")).toEqual([
       ["statusline", "Live:"],
+      ["context", "Live:"],
       ["sessions", "Reports:"],
       ["view", "Reports:"],
       ["doctor", "Reports:"],

@@ -301,6 +301,7 @@ same two groups.
 ```
 Live:
 ccplus statusline         cost, context, and rate limit panel for statusLine
+ccplus context [id]       what is filling the context window right now
 ccplus watch [id]         tail a session, stream cost as it changes
 ccplus view --follow      the transcript, appended live as the session grows
 
@@ -432,6 +433,68 @@ Settings snippet:
 ```json
 { "statusLine": { "type": "command", "command": "ccplus statusline" } }
 ```
+
+#### `context` (2026-08-01)
+
+Answers what the statusline gauge cannot: not how full the window is, but what
+is in it. `src/cost/context.ts` does the analysis, `src/commands/context.ts`
+renders it.
+
+**Three numbers, two of them exact.** The report is built around keeping the
+measured and the estimated apart on the page.
+
+| | Where it comes from |
+| --- | --- |
+| fill | the last request's `input + cache_read + cache_creation`. Exact. |
+| startup | the **first** request's same sum, so the system prompt, the tool definitions and any files loaded at session start. Exact, and measured rather than assumed. |
+| the split | fitted from logged text. Estimated, and every number wears a `~`. |
+
+**Why the split is a division and not a conversion.** The obvious approach,
+counting characters and dividing by a tokens-per-character constant, produces
+a total that does not match anything the user can check. Instead the measured
+growth (`total - startup`) is divided between the origins in proportion to
+their weighted characters. The parts therefore always sum to the real number,
+and the only claim being made is about **relative share**, which is the part
+character counts actually predict well. The absolute scale comes from the API.
+
+**Calibration, measured over 43 real local sessions.** Characters per token
+land at 2.0 for tool output, 2.3 for prose and 1.9 for tool inputs — nowhere
+near the usual 4, because code and JSON tokenize far worse than English. Those
+weights only set the ratios between rows; the scale is measured. The first
+request lands between 22.5k and 32.3k tokens with a median of 28k, which is
+the real size of the fixed overhead and is worth showing on its own line.
+
+**What the log cannot see, and how the report says so.** Two things occupy the
+window and are never written to disk. Thinking blocks are logged with their
+text stripped — 2,719 of them across the 45 local sessions, every one empty —
+and Claude Code injects per-turn reminders that never appear as content at
+all. Their tokens are real and land in the measured growth, so the division
+spreads them across the rows. `coverage` on the result is what exposes this:
+it is what fraction of the growth the logged text accounts for, near 1 when
+the window is almost all things the log wrote down. It runs about 0.7 to 0.85
+on real sessions, and a footnote states it rather than letting the rows imply
+a precision they do not have.
+
+**Compaction.** A `type: "system", subtype: "compact_boundary"` line carries
+`compactMetadata` with `preTokens`, `postTokens` and the trigger. This matters
+because everything logged before that boundary was thrown out of the window,
+so summing the whole branch overstates it — badly, by 4x on the one local
+session that has been compacted. `SessionMeta.compaction` exposes it, the
+baseline becomes `postTokens` instead of the opening request, and only events
+stamped after the boundary are attributed. Rare (1 of 45 sessions) but wrong
+enough to be worth handling rather than flagging.
+
+**Images.** Tool results carry base64 image blocks the parser already collapses
+to an `[image]` placeholder. Seven characters cannot stand in for a screenshot,
+so they are counted and priced at a flat rate, and the footnote says the rate
+is flat. The log stores pixels, not the dimensions the price depends on, so
+nothing better is available without decoding megabytes of base64.
+
+**Grouping.** Tools with a `file_path` (Read, Write, Edit, MultiEdit, and the
+notebook pair) group per file, so the same file read six times is one row with
+a count. That count is the actionable finding: each read puts the same bytes
+in the window again. Everything else groups by `toolCategory`, since one bash
+call does not deserve a row.
 
 #### `watch`
 
@@ -566,6 +629,49 @@ export always expands, since it is read later by someone who cannot rerun it.
   a real cost.
 - Exit codes: 0 ok, 1 error, 2 no sessions found (scriptable).
 - Session IDs accept unambiguous prefixes (`view 3ab5`).
+
+### README images (2026-08-01)
+
+`npm run record` renders every image in the README, and `npm run record view`
+renders one. Needs `brew install vhs`. The tapes are checked in at
+`docs/tapes/*.tape`, so an image can be rebuilt when the output it shows
+changes, rather than quietly going stale.
+
+**Nothing is recorded against `~/.claude/projects`.** A README image built
+from real logs puts real project names, real file paths and real prompts on a
+public page. Scrubbed fixtures do not work either: every string in them is a
+placeholder, so the screenshots would read as nonsense. So
+`scripts/demo-sessions.mjs` invents a set of sessions in the real log shape —
+four projects, a year of activity for the contribution graph, and one hand
+written session about a double applied discount code that the `context` and
+`view` images are both taken from.
+
+ccplus finds them through `CCPLUS_ROOT`, the one env var it reads. That is an
+escape hatch and not configuration: there is nothing to set for normal use and
+no file anywhere remembers it. `scripts/record.sh` puts a shim named `ccplus`
+on PATH that pins the variable, so a tape typing `ccplus context` cannot reach
+real logs even if it is run by hand.
+
+`follow.gif` is the one image that has to move, since a still frame of a live
+transcript is just a transcript. `scripts/demo-grow.mjs` writes a session one
+turn at a time in the background while VHS records, and follow with no id
+lands on it because it is the newest file in the root.
+
+**The hero gif is the exception to all of the above.** A recording of a real
+Claude Code session running beside the statusline cannot be a tape, because
+VHS types into a scripted shell and cannot drive Claude. So it is a manual
+screen recording (`Cmd+Shift+5`, or Kap), converted by `scripts/togif.sh`. It
+will not re-render when output changes and will drift eventually, which is the
+price of the one asset that actually sells the tool. Record it in a throwaway
+repo: whatever is on screen ends up on a public page.
+
+`togif.sh` speeds the recording up and encodes it in two passes. The palette
+pass is not optional — a gif holds 256 colors, and ffmpeg's default pick bands
+a terminal into mush. `stats_mode=diff` and `diff_mode=rectangle` exploit the
+fact that a screen recording is mostly a still image with a small part moving,
+which roughly halves the file on terminal footage. Dithering is `bayer` rather
+than the prettier `sierra2_4a`, which scatters noise across flat terminal
+backgrounds and wrecks the compression.
 
 ## 6. Explicitly out of scope (v1)
 

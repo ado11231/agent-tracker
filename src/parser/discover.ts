@@ -14,7 +14,14 @@ export interface SessionFile {
   sizeBytes: number;
 }
 
+// Where Claude Code keeps its logs. CCPLUS_ROOT points somewhere else,
+// which exists for recording the README images against demo sessions
+// rather than against someone's real client work. It is not
+// configuration: there is nothing to set for normal use, and no file
+// anywhere remembers it.
 export function defaultProjectsRoot(): string {
+  const override = process.env.CCPLUS_ROOT;
+  if (override !== undefined && override !== "") return override;
   return join(homedir(), ".claude", "projects");
 }
 

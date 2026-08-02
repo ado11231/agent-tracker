@@ -69,7 +69,11 @@ function twoSided(
   return styledLeft + " ".repeat(Math.max(gap, 1)) + styledRight;
 }
 
-function shortenPath(path: string, cwd: string | undefined): string {
+// A path as the reader thinks of it: relative to the project it
+// belongs to, or against home when it sits outside. Exported because
+// the context report names the same files and has to name them the
+// same way.
+export function shortenPath(path: string, cwd: string | undefined): string {
   if (cwd !== undefined && path.startsWith(`${cwd}/`)) {
     return path.slice(cwd.length + 1);
   }

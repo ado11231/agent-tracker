@@ -5,6 +5,7 @@ import {
   DASHBOARD_SPANS,
   type DashboardSpan,
 } from "./commands/dashboard.js";
+import { runContext } from "./commands/context.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runSessions } from "./commands/sessions.js";
 import { runStatusline } from "./commands/statusline.js";
@@ -33,6 +34,7 @@ interface RawOpts {
   compact?: boolean;
   export?: boolean | string;
   span?: DashboardSpan;
+  window?: string;
 }
 
 function toFlags(opts: RawOpts): CommandFlags {
@@ -90,6 +92,29 @@ export function buildProgram(): Command {
     .action(async (_opts: RawOpts, command: Command) => {
       const opts = command.optsWithGlobals() as RawOpts;
       process.exitCode = await runStatusline(toFlags(opts));
+    });
+
+  withCommonFlags(program.command("context"))
+    .option("--ascii", "swap unicode glyphs for ascii")
+    .helpGroup(LIVE)
+    .description(
+      "Show what is filling the context window, latest session if id omitted",
+    )
+    .argument("[id]", "session id, unambiguous prefixes accepted")
+    .option("--project <path>", "only sessions from this project directory")
+    .option("--window <tokens>", "context window size, when the guess is wrong")
+    .action(async (id: string | undefined, _opts: RawOpts, command: Command) => {
+      const opts = command.optsWithGlobals() as RawOpts;
+      let window: number | undefined;
+      if (opts.window !== undefined) {
+        window = Number(opts.window);
+        if (!Number.isInteger(window) || window <= 0) {
+          console.error(`invalid --window: ${opts.window}`);
+          process.exitCode = 1;
+          return;
+        }
+      }
+      process.exitCode = await runContext({ ...toFlags(opts), id, window });
     });
 
   withReportWindowFlags(withCommonFlags(program.command("sessions")))

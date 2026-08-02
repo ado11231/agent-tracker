@@ -41,9 +41,17 @@ export interface ViewFlags extends CommandFlags {
 // Both live modes poll, so they take the same options.
 export type ViewOptions = CompactOptions;
 
-type Target =
+export type Target =
   | { file: SessionFile; session: ExtractedSession }
   | { code: number };
+
+// Only the fields resolution needs, so any command that opens one
+// session by id can share this rather than growing its own copy.
+export interface TargetFlags {
+  id: string | undefined;
+  project: string | undefined;
+  root?: string;
+}
 
 // Picks the session to render: the id prefix when given, the newest
 // otherwise. Files are parsed newest first, one at a time, so the
@@ -51,7 +59,7 @@ type Target =
 // that hold no conversation are skipped. Claude Code writes stub
 // files with only bookkeeping lines, and the newest file is often
 // one.
-async function resolveTarget(flags: ViewFlags): Promise<Target> {
+export async function resolveTarget(flags: TargetFlags): Promise<Target> {
   const files = await discoverSessionFiles(flags.root ?? defaultProjectsRoot());
 
   let candidates = files;
