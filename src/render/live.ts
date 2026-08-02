@@ -45,12 +45,12 @@ export function currentContext(session: ExtractedSession): CurrentContext {
 //
 //   sec-review · opus-4-8 · high · 2 turns                what is running
 //   $0.19 · $2.40/hr · $0.03 wasted · +156 −23            what it cost
-//   ctx  ▓▓▓░░░░░░░░░░░░░░░░░  14%   27.4k / 200k         room left
-//   5h   ▓▓▓▓▓░░░░░░░░░░░░░░░  24%   41% week · 89% cache  quota left
+//   ctx    ▓▓▓░░░░░░░░░░░░░░░░░  14%   27.4k / 200k        room left
+//   5h     ▓▓▓▓▓░░░░░░░░░░░░░░░  24%   41% week · 89% cache  quota left
 //
-// The two gauges label themselves in a fixed left column, so the bars
-// start in the same place and the pair reads as one block rather than
-// as two unrelated lines.
+// The gauges label themselves in a fixed left column, so the bars start
+// in the same place and the pair reads as one block rather than as two
+// unrelated lines.
 //
 // Each returned string is one row, since Claude Code renders a line
 // of output per row. Every row and every segment within a row drops
@@ -96,12 +96,13 @@ const GAUGE_MIN = 6;
 // Plain spacing after a gauge, wider than the dot separator so the bar
 // reads as its own object rather than as the first field in a list.
 const GAUGE_GAP = "   ";
-// The label column ahead of a gauge. Both gauge rows pad their label to
-// the same width, so the two bars start in the same column and stack as
-// one block instead of two loose lines. A longer label is not cut: it
-// only ever appears on a panel drawing a single gauge, where there is
-// nothing to line up with.
-const LABEL_WIDTH = 3;
+// The label column ahead of a gauge. Every gauge row pads its label to
+// this, so the bars start in the same column and stack as one block
+// instead of two loose lines. Wide enough for the longest label there
+// is, `cache`: it shares the panel with `ctx` whenever there is no
+// subscription to report, and a column sized to `ctx` alone put the two
+// bars two apart.
+const LABEL_WIDTH = 5;
 const GAUGE_WARN = 0.5;
 const GAUGE_DANGER = 0.8;
 
@@ -366,6 +367,9 @@ export function statuslineText(
   summary: SessionSummary,
   context: CurrentContext,
   change?: TurnDelta,
+  // The separator, so --ascii reaches the compact log the same as it
+  // reaches every other rendered surface. Defaults to the unicode dot.
+  dot = "·",
 ): string {
   const model = context.model ?? summary.models[summary.models.length - 1];
   const known = summary.total.unknownModels.length === 0;
@@ -382,5 +386,5 @@ export function statuslineText(
     context.tokens > 0 ? `${fmtTokens(context.tokens)} ctx` : undefined,
     `${summary.turns} ${summary.turns === 1 ? "turn" : "turns"}`,
   ].filter((seg): seg is string => seg !== undefined);
-  return segments.join(" · ");
+  return segments.join(` ${dot} `);
 }

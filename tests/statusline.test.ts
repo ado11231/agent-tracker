@@ -199,7 +199,7 @@ describe("statuslinePanel", () => {
     expect(row).toContain("░");
     expect(row).toContain("14%");
     // The label says what is being measured, so the counts drop "ctx".
-    expect(row).toMatch(/^ctx {2}▓/);
+    expect(row).toMatch(/^ctx {4}▓/);
     expect(row).toContain("27.4k / 200k");
   });
 
@@ -210,7 +210,7 @@ describe("statuslinePanel", () => {
   });
 
   it("shows at least one filled cell once any context is used", () => {
-    expect(panel(200)[2] as string).toMatch(/^ctx {2}▓░+/);
+    expect(panel(200)[2] as string).toMatch(/^ctx {4}▓░+/);
   });
 
   it("respects a larger context window from the session json", () => {
@@ -290,7 +290,7 @@ describe("statuslinePanel", () => {
       fiveHour: { usedPercentage: 24 },
       sevenDay: { usedPercentage: 41.2 },
     })[3] as string;
-    expect(row).toMatch(/^5h {3}▓+░+ +24%/);
+    expect(row).toMatch(/^5h {5}▓+░+ +24%/);
     expect(row).toContain("41% week");
   });
 
@@ -316,6 +316,32 @@ describe("statuslinePanel", () => {
     expect(rows).toHaveLength(4);
     expect(rows[3]).toMatch(/^cache {2}▓+░* +90%/);
     expect(rows[3]).toContain("hit rate");
+  });
+
+  // The cache gauge shares the panel with the context gauge whenever
+  // there is no subscription, and `cache` is longer than `ctx`, so a
+  // label column sized to `ctx` put the two bars two columns apart.
+  it("starts every gauge bar in the same column", () => {
+    const rows = panel(27_400, 200_000, {
+      total: {
+        ...emptyRollup(),
+        messages: 4,
+        usd: 0.19,
+        tokens: {
+          input: 1000,
+          output: 0,
+          cacheRead: 9000,
+          cacheWrite5m: 0,
+          cacheWrite1h: 0,
+        },
+      },
+    });
+    const gauges = rows.filter((row) => row.includes("▓"));
+    expect(gauges).toHaveLength(2);
+    const starts = gauges.map((row) => row.indexOf("▓"));
+    expect(new Set(starts).size).toBe(1);
+    // The longest label is what sets the column width.
+    expect(starts[0]).toBe("cache".length + 2);
   });
 
   it("appends the cache share to the rate limit row when both exist", () => {
@@ -346,8 +372,8 @@ describe("statuslinePanel", () => {
   // The four rows at their full width, which the cases below narrow:
   //   sec-review · opus-4-8 · high · fast · 2 turns           45
   //   $0.19 · $0.19/hr · +156 −23                             27
-  //   ctx  ▓▓▓░░░░░░░░░░░░░░░░░   14%   27.4k / 200k          46
-  //   5h   ▓▓▓▓▓░░░░░░░░░░░░░░░   24%   41% week · 90% cache  54
+  //   ctx    ▓▓▓░░░░░░░░░░░░░░░░░   14%   27.4k / 200k        48
+  //   5h     ▓▓▓▓▓░░░░░░░░░░░░░░░   24%   41% week · 90% cache  56
   function wide(width?: number): string[] {
     return panel(
       27_400,
@@ -388,9 +414,9 @@ describe("statuslinePanel", () => {
   });
 
   it("shortens only the rows that do not fit", () => {
-    // 46 columns is exactly the context row, so only the limits row
-    // above it has anything to give up.
-    const rows = wide(46);
+    // 48 columns is exactly the context row, so only the limits row
+    // under it has anything to give up.
+    const rows = wide(48);
     expect(rows[0]).toBe(wide()[0]);
     expect(rows[1]).toBe(wide()[1]);
     expect(rows[2]).toBe(wide()[2]);
@@ -408,8 +434,8 @@ describe("statuslinePanel", () => {
     // The label leads the gauge, so a row stripped back to the bar
     // still says which limit it is drawing. The bar itself narrows to
     // whatever the terminal left it.
-    expect(rows[2]).toMatch(/^ctx {2}▓+░+ {3}14%$/);
-    expect(rows[3]).toMatch(/^5h {3}▓+░+ {3}24%$/);
+    expect(rows[2]).toMatch(/^ctx {4}▓+░+ {3}14%$/);
+    expect(rows[3]).toMatch(/^5h {5}▓+░+ {3}24%$/);
     for (const row of rows) expect(row.length).toBeLessThanOrEqual(30);
   });
 
@@ -420,7 +446,7 @@ describe("statuslinePanel", () => {
   });
 
   it("measures the visible width, not the ansi escapes", () => {
-    // Styled, this row is far past 46 bytes and still 46 columns, so
+    // Styled, this row is far past 48 bytes and still 48 columns, so
     // the detail survives rather than being counted out by escapes.
     const row = statuslinePanel(
       summary({ total: { ...emptyRollup(), usd: 0.19 }, turns: 2 }),
@@ -429,10 +455,10 @@ describe("statuslinePanel", () => {
         c: makeStyle(true),
         g: glyphsFor(false),
         contextWindow: 200_000,
-        width: 46,
+        width: 48,
       },
     )[2] as string;
-    expect(row.length).toBeGreaterThan(46);
+    expect(row.length).toBeGreaterThan(48);
     expect(row).toContain("27.4k / 200k");
   });
 });

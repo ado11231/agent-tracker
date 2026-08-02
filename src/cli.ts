@@ -58,9 +58,10 @@ function withCommonFlags(command: Command): Command {
 
 // The report scan narrowing flags. Only the commands that actually
 // consult loadSessions' time/cwd window take these, so view, doctor
-// (except --project) and statusline do not. --ascii is not here: it
-// is registered per-command on the ones whose render uses glyphs
-// (dashboard, statusline, view). sessions and doctor do not take it.
+// (except --project) and statusline do not. --ascii is not here
+// either: it is registered per-command on the ones whose render uses
+// glyphs, which is every command but sessions — the only report that
+// prints nothing outside ascii already.
 function withReportWindowFlags(command: Command): Command {
   return command
     .option("--project <path>", "only sessions from this project directory")
@@ -170,6 +171,7 @@ export function buildProgram(): Command {
 
   withCommonFlags(program.command("doctor"))
     .option("--project <path>", "only sessions from this project directory")
+    .option("--ascii", "swap unicode glyphs for ascii")
     .helpGroup(REPORTS)
     .description("Report parse health: skipped lines and unknown model ids")
     .action(async (_opts: RawOpts, command: Command) => {

@@ -66,8 +66,9 @@ turns that into a cost log instead, one line each time the numbers move.
 
 `ccplus` on its own gives the image at the top of this page: today and this
 week, then totals by project, model and tool. `--span year` adds the
-contribution graph, each day tinted by whichever model spent the most on it
-and the glyph carrying how much.
+contribution graph: one square per day, tinted by whichever model spent the
+most on it and brightening with how much. Piped or under `NO_COLOR`, where
+brightness cannot say it, the squares become a shade ramp that can.
 
 `ccplus sessions` lists them newest first. The short id is what `view` wants,
 and any unambiguous prefix will do. `--grep` searches what you typed and shows
@@ -101,7 +102,7 @@ narrow the reports. The rest belong to one command each:
 | `--limit`, `--model`, `--grep` | `sessions` |
 | `--full`, `--costs`, `--follow`, `--compact`, `--export` | `view` |
 | `--window <tokens>` | `context` |
-| `--ascii` | dashboard, `view`, `context`, `statusline` |
+| `--ascii` | everywhere but `sessions`, which prints no glyphs |
 
 Color never carries meaning on its own. It only repeats something a glyph, a
 column or a heading already said, so `NO_COLOR`, `--no-color` and piping to a

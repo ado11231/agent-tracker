@@ -102,6 +102,15 @@ describe("sessionSnapshot", () => {
   it("returns undefined for an unreadable file", async () => {
     expect(await sessionSnapshot("/no/such/file.jsonl")).toBeUndefined();
   });
+
+  // The log is plain text, but the separator between its fields is a
+  // glyph like any other, so --ascii has to reach it.
+  it("swaps the separator under ascii", async () => {
+    expect((await sessionSnapshot(BASIC))?.text).toContain(" · ");
+    const ascii = await sessionSnapshot(BASIC, true);
+    expect(ascii?.text).not.toContain("·");
+    expect(ascii?.text).toContain(" . ");
+  });
 });
 
 describe("cost delta", () => {

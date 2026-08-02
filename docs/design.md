@@ -348,15 +348,17 @@ row per printed line, in its own block **above** the built-in footer badges
 ```
 sec-review · opus-4-8 · high · 2 turns                 what is running
 $0.19 · $2.40/hr · $0.03 wasted · +156 −23             what it cost
-ctx  ▓▓▓░░░░░░░░░░░░░░░░░  14%   27.4k / 200k          room left
-5h   ▓▓▓▓▓░░░░░░░░░░░░░░░  24%   41% week · 89% cache   quota left
+ctx    ▓▓▓░░░░░░░░░░░░░░░░░  14%   27.4k / 200k        room left
+5h     ▓▓▓▓▓░░░░░░░░░░░░░░░  24%   41% week · 89% cache  quota left
 ```
 
-Each gauge names itself in a fixed left column, so the two bars start in the
-same place and stack as one block rather than two loose lines. The bar is 20
-cells and is the only part of a gauge row that can give ground: label,
-percentage and gaps are fixed, so a narrow terminal shrinks the bar (down to
-6, past which it is a smudge rather than a gauge) instead of overflowing.
+Each gauge names itself in a fixed left column — 5 wide, sized to the longest
+label there is (`cache`, which shares the panel with `ctx` whenever there is
+no subscription) — so the bars start in the same place and stack as one block
+rather than two loose lines. The bar is 20 cells and is the only part of a
+gauge row that can give ground: label, percentage and gaps are fixed, so a
+narrow terminal shrinks the bar (down to 6, past which it is a smudge rather
+than a gauge) instead of overflowing.
 
 Every row and every segment drops out when its data is missing, rather than
 rendering a zero — so the panel shrinks back to two rows on an API plan with
@@ -584,15 +586,22 @@ NDJSON, one object per settled turn.
 
 ### Flags
 
-Global (every command):
+Shared, though not every command registers every one — commander scopes
+options per command, and a command only takes a flag it actually reads:
 
-| Flag | Behavior |
-|---|---|
-| `--json` | machine-readable output |
-| `--no-color` | strip styling (also triggered by `NO_COLOR` env and pipe detection) |
-| `--ascii` | glyphs `●◆⚡✎└` → `* > $ + \_` (CI logs, exotic terminals) |
-| `--project <path>` | scope to one project (default: all) |
-| `--since <date>` / `--until <date>` | time window for metrics |
+| Flag | Behavior | On |
+|---|---|---|
+| `--json` | machine-readable output | all |
+| `--no-color` | strip styling (also triggered by `NO_COLOR` env and pipe detection) | all |
+| `--ascii` | glyphs `●◆⚡✎└` → `* > $ + \_` (CI logs, exotic terminals) | all but `sessions` |
+| `--project <path>` | scope to one project (default: all) | all but `view`, `statusline` |
+| `--since <date>` / `--until <date>` | time window for metrics | dashboard, `sessions` |
+
+`--ascii` goes on every command that prints a glyph, which is every one but
+`sessions` — the only report already inside ascii. That includes `doctor`,
+whose sole glyph is the `·` in its header, and the `view --follow --compact`
+log, whose sole glyph is the `·` between its fields. A flag that swaps glyphs
+has to swap all of them or it is not worth having.
 
 `view` only: `--full` (expand raw commands, tool outputs, thinking),
 `--costs` (per-message cost badges), `-f/--follow` (keep appending turns as
@@ -601,6 +610,10 @@ the session grows), `--compact` (with `--follow`, a cost log instead),
 
 `sessions` only: `--limit <n>` (default 20, 0 shows all), `--model <text>`,
 `--grep <text>`.
+
+`context` only: `--window <tokens>`, for when the inferred window size is
+wrong. Both `view` and `context` take an optional `[id]` argument, an
+unambiguous session id prefix, defaulting to the newest session.
 
 Dashboard (bare `ccplus`) only: `--span week|month|year`, a single ladder
 where each rung keeps what the one below showed. `week` (the default) is
@@ -691,12 +704,14 @@ never the raw numbers between them. Model rows take the hue the heatmap legend
 assigned that model, and tool rows take the hue the tool wears in a transcript,
 so a color always means the same thing across commands.
 
-**Flag surface (2026-07-27):** 15 flags over 5 commands. Six are global
-(`--json`, `--no-color`, `--ascii`, `--project`, `--since`, `--until`); the
-rest are the ones listed above. Three were folded away in the same pass that
-cut the over built features: `--year` and `--month` became `--span`, `-o` was
-absorbed into `--export [path]`, and `--no-full` went with the rule that an
-export always expands, since it is read later by someone who cannot rerun it.
+**Flag surface (audited 2026-08-01):** 16 distinct flags over 5 commands plus
+the bare dashboard. Six are shared (`--json`, `--no-color`, `--ascii`,
+`--project`, `--since`, `--until`); the other ten belong to one command each
+— five on `view`, three on `sessions`, `--window` on `context`, `--span` on
+the dashboard. Three were folded away in the pass that cut the over built
+features: `--year` and `--month` became `--span`, `-o` was absorbed into
+`--export [path]`, and `--no-full` went with the rule that an export always
+expands, since it is read later by someone who cannot rerun it.
 
 ### UX rules
 
@@ -705,7 +720,11 @@ export always expands, since it is read later by someone who cannot rerun it.
 - Unknown model in logs → tokens shown, cost column reads `?`, one dim
   footnote pointing at `doctor`. Never a crash, never a zero passed off as
   a real cost.
-- Exit codes: 0 ok, 1 error, 2 no sessions found (scriptable).
+- Exit codes: 0 ok, 1 bad input (an unparseable date, a `--limit` that is not
+  a count, an unknown option), 2 nothing to work with (no sessions found, no
+  session matching an id) or a mode that does not combine (`--compact`
+  without `--follow`, `--export` with it, `--json` with `--compact`).
+  Verified across every command 2026-08-01.
 - Session IDs accept unambiguous prefixes (`view 3ab5`).
 
 ### README images (2026-08-01)

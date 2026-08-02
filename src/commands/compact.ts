@@ -6,6 +6,7 @@ import {
 } from "../cost/aggregate.js";
 import { parseSessionFile } from "../parser/session.js";
 import { fmtClock } from "../render/format.js";
+import { glyphsFor } from "../render/glyphs.js";
 import {
   currentContext,
   statuslineText,
@@ -22,6 +23,10 @@ import { pollFile, type PollOptions } from "./poll.js";
 
 export interface CompactOptions extends PollOptions {
   now?: () => Date;
+  // Swap the separator for its ascii twin, inherited from view's
+  // --ascii. The log is plain text either way; this is the one glyph
+  // in it.
+  ascii?: boolean;
 }
 
 export interface SessionSnapshot {
@@ -39,6 +44,7 @@ export interface SessionSnapshot {
 // (a torn write mid append).
 export async function sessionSnapshot(
   filePath: string,
+  ascii = false,
 ): Promise<SessionSnapshot | undefined> {
   let parsed;
   try {
@@ -51,7 +57,8 @@ export async function sessionSnapshot(
     parsed.session,
   );
   const context = currentContext(parsed.session);
-  return { summary, context, text: statuslineText(summary, context) };
+  const dot = glyphsFor(ascii).dot;
+  return { summary, context, text: statuslineText(summary, context, undefined, dot) };
 }
 
 // Prints, stamped with the wall clock, only when the cost line moved,
@@ -62,11 +69,17 @@ async function emit(
   filePath: string,
   last: SessionSnapshot | undefined,
   now: () => Date,
+  ascii = false,
 ): Promise<SessionSnapshot | undefined> {
-  const snapshot = await sessionSnapshot(filePath);
+  const snapshot = await sessionSnapshot(filePath, ascii);
   if (snapshot === undefined || snapshot.text === last?.text) return last;
   const delta = turnDelta(last?.summary.total, snapshot.summary.total);
-  const line = statuslineText(snapshot.summary, snapshot.context, delta);
+  const line = statuslineText(
+    snapshot.summary,
+    snapshot.context,
+    delta,
+    glyphsFor(ascii).dot,
+  );
   console.log(`${fmtClock(now())}  ${line}`);
   return snapshot;
 }
@@ -89,7 +102,7 @@ export async function runCompact(
     filePath,
     { ...options, onStop: () => console.error("") },
     async () => {
-      last = await emit(filePath, last, now);
+      last = await emit(filePath, last, now, options.ascii === true);
     },
   );
 }

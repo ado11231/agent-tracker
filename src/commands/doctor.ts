@@ -1,4 +1,5 @@
 import { shortId } from "../render/format.js";
+import { glyphsFor } from "../render/glyphs.js";
 import { roles } from "../render/palette.js";
 import { colorEnabled, makeStyle } from "../render/style.js";
 import { loadSessions, type CommandFlags, type LoadedSession } from "./load.js";
@@ -92,10 +93,13 @@ export async function runDoctor(flags: CommandFlags): Promise<number> {
 
   const c = makeStyle(colorEnabled(flags.color));
   const r = roles(c);
+  // The separator is the one glyph this report draws, and it is the one
+  // reason doctor takes --ascii.
+  const dot = c.dim(glyphsFor(flags.ascii === true).dot);
   const lines: string[] = [];
   lines.push(
-    `${c.bold("ccplus doctor")} ${c.dim("·")} ${sessions.length} sessions ` +
-      `${c.dim("·")} ${totalLines.toLocaleString()} lines read`,
+    `${c.bold("ccplus doctor")} ${dot} ${sessions.length} sessions ` +
+      `${dot} ${totalLines.toLocaleString()} lines read`,
   );
   lines.push("");
 

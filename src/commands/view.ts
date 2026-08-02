@@ -159,7 +159,7 @@ export async function runView(
       console.error("--compact has no --json output yet");
       return 2;
     }
-    return await runCompact(file.filePath, options);
+    return await runCompact(file.filePath, { ...options, ascii: flags.ascii });
   }
 
   if (flags.exportAs) {

@@ -428,6 +428,18 @@ describe("doctor", () => {
     expect(await runDoctor(flags(empty))).toBe(2);
   });
 
+  // The separator in its header is the one glyph this report draws,
+  // and the one reason it takes --ascii at all.
+  it("swaps its separator under --ascii", async () => {
+    const root = await makeRoot();
+    expect(await runDoctor(flags(root, { json: false }))).toBe(0);
+    expect(logged()).toContain("·");
+    logSpy.mockClear();
+    expect(await runDoctor(flags(root, { json: false, ascii: true }))).toBe(0);
+    expect(logged()).not.toContain("·");
+    expect(logged()).toContain("ccplus doctor . ");
+  });
+
   it("does not flag stub sessions holding only metadata lines", async () => {
     const root = await mkdtemp(join(tmpdir(), "ccplus-stub-"));
     const project = join(root, "-scrubbed-stub");
