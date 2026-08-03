@@ -1,5 +1,5 @@
 {
-  "name": "ccplus",
+  "name": "ccvitals",
   "version": "0.1.0",
   "description": "Token metrics for Claude Code sessions",
   "keywords": [
@@ -15,16 +15,16 @@
   "type": "module",
   "license": "MIT",
   "author": "Adnan Alagic",
-  "homepage": "https://github.com/ado11231/ccplus#readme",
+  "homepage": "https://github.com/ado11231/ccvitals#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ado11231/ccplus.git"
+    "url": "git+https://github.com/ado11231/ccvitals.git"
   },
   "bugs": {
-    "url": "https://github.com/ado11231/ccplus/issues"
+    "url": "https://github.com/ado11231/ccvitals/issues"
   },
   "bin": {
-    "ccplus": "dist/main.js"
+    "ccvitals": "dist/main.js"
   },
   "files": [
     "dist"

@@ -42,7 +42,7 @@ if [ ! -f "$IN" ]; then
   exit 1
 fi
 
-PALETTE=$(mktemp -t ccplus-palette).png
+PALETTE=$(mktemp -t ccvitals-palette).png
 trap 'rm -f "$PALETTE"' EXIT
 
 # setpts divides each frame's timestamp, so PTS/3 plays three times as

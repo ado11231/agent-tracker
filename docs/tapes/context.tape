@@ -18,7 +18,7 @@ Hide
 Type "clear" Enter
 Show
 
-Type "ccplus context"
+Type "ccvitals context"
 Sleep 800ms
 Enter
 Sleep 5s

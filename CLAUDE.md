@@ -1,4 +1,4 @@
-# CLAUDE.md — ccplus
+# CLAUDE.md — ccvitals
 
 > Standing context for any Claude Code session working on this project.
 

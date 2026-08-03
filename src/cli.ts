@@ -67,7 +67,7 @@ export function buildProgram(): Command {
   const program = new Command();
 
   program
-    .name("ccplus")
+    .name("ccvitals")
     .description("Token metrics for Claude Code sessions")
     .version(version);
 
@@ -143,7 +143,7 @@ export function buildProgram(): Command {
       );
     });
 
-  // Running ccplus with no command shows the dashboard. --span is how
+  // Running ccvitals with no command shows the dashboard. --span is how
   // far back to look, one rung at a time: week is today and this week,
   // month widens both rows, year adds the heatmap on top. It lives on
   // the root program because the bare dashboard is not a subcommand.

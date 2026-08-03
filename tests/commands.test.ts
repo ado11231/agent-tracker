@@ -102,7 +102,7 @@ async function writeSearchable(
 }
 
 async function makeRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "ccplus-commands-"));
+  const root = await mkdtemp(join(tmpdir(), "ccvitals-commands-"));
   const projectA = join(root, "-scrubbed-projectA");
   const projectB = join(root, "-scrubbed-projectB");
   await mkdir(projectA);
@@ -146,7 +146,7 @@ describe("dashboard", () => {
   });
 
   it("exits 2 when there are no sessions", async () => {
-    const empty = await mkdtemp(join(tmpdir(), "ccplus-empty-"));
+    const empty = await mkdtemp(join(tmpdir(), "ccvitals-empty-"));
     expect(await runDashboard(flags(empty))).toBe(2);
   });
 
@@ -172,7 +172,7 @@ describe("dashboard", () => {
     const code = await runDashboard(flags(await makeRoot(), { json: false }));
     expect(code).toBe(0);
     const text = logged();
-    expect(text).toContain("ccplus");
+    expect(text).toContain("ccvitals");
     expect(text).toContain("today");
     expect(text).toContain("model");
     expect(text).not.toContain("[");
@@ -184,7 +184,7 @@ describe("dashboard", () => {
     const lines = logged().split("\n");
     // The name alone, a blank, then the labels over their values. No
     // rule under the name: the blank line is the separation.
-    expect(lines[0]).toBe("  ccplus");
+    expect(lines[0]).toBe("  ccvitals");
     const labels = lines.findIndex((line) => line.includes("cache hit"));
     expect(labels).toBeGreaterThan(0);
     for (const label of ["all time", "sessions", "messages", "cache hit"]) {
@@ -424,7 +424,7 @@ describe("doctor", () => {
   });
 
   it("exits 2 when there are no sessions", async () => {
-    const empty = await mkdtemp(join(tmpdir(), "ccplus-empty-"));
+    const empty = await mkdtemp(join(tmpdir(), "ccvitals-empty-"));
     expect(await runDoctor(flags(empty))).toBe(2);
   });
 
@@ -437,11 +437,11 @@ describe("doctor", () => {
     logSpy.mockClear();
     expect(await runDoctor(flags(root, { json: false, ascii: true }))).toBe(0);
     expect(logged()).not.toContain("·");
-    expect(logged()).toContain("ccplus doctor . ");
+    expect(logged()).toContain("ccvitals doctor . ");
   });
 
   it("does not flag stub sessions holding only metadata lines", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ccplus-stub-"));
+    const root = await mkdtemp(join(tmpdir(), "ccvitals-stub-"));
     const project = join(root, "-scrubbed-stub");
     await mkdir(project);
     await writeFile(

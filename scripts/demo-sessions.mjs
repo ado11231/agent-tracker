@@ -6,7 +6,7 @@
 // page. Scrubbed fixtures cannot be used either, since every string in
 // them is a placeholder and the screenshots would read as nonsense.
 // So the demo data is written from scratch here, in the same shape the
-// real logs use, and ccplus reads it through CCPLUS_ROOT.
+// real logs use, and ccvitals reads it through CCVITALS_ROOT.
 //
 // Everything below is invented. Any resemblance to a real session is
 // the point, and a coincidence.
@@ -221,7 +221,7 @@ const PROJECTS = [
   { name: "checkout-api", slug: "-Users-you-code-checkout-api", cwd: "/Users/you/code/checkout-api", weight: 3.4 },
   { name: "landing-page", slug: "-Users-you-code-landing-page", cwd: "/Users/you/code/landing-page", weight: 1.6 },
   { name: "dotfiles", slug: "-Users-you-code-dotfiles", cwd: "/Users/you/code/dotfiles", weight: 0.7 },
-  { name: "ccplus", slug: "-Users-you-code-ccplus", cwd: "/Users/you/code/ccplus", weight: 2.1 },
+  { name: "ccvitals", slug: "-Users-you-code-ccvitals", cwd: "/Users/you/code/ccvitals", weight: 2.1 },
 ];
 
 // The session the context and view images are taken from. Written by
@@ -358,7 +358,7 @@ async function main() {
     }
   }
 
-  // ccplus resolves "the latest session" by file mtime, and the filler
+  // ccvitals resolves "the latest session" by file mtime, and the filler
   // is written after the feature session, so without this the context
   // and statusline images land on whichever throwaway session happened
   // to be written last. That is usually a one turn session with an
@@ -373,8 +373,8 @@ async function main() {
   }
 
   console.log(`wrote ${files} demo sessions to ${OUT}`);
-  console.log("point ccplus at them with:");
-  console.log(`  CCPLUS_ROOT=${OUT} node dist/main.js`);
+  console.log("point ccvitals at them with:");
+  console.log(`  CCVITALS_ROOT=${OUT} node dist/main.js`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) await main();

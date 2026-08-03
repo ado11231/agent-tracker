@@ -143,7 +143,7 @@ export async function runDoctor(flags: CommandFlags): Promise<number> {
   const dot = c.dim(glyphsFor(flags.ascii === true).dot);
   const lines: string[] = [];
   lines.push(
-    `${c.bold("ccplus doctor")} ${dot} ${sessions.length} session${sessions.length === 1 ? "" : "s"} ` +
+    `${c.bold("ccvitals doctor")} ${dot} ${sessions.length} session${sessions.length === 1 ? "" : "s"} ` +
       `${dot} ${totalLines.toLocaleString()} line${totalLines === 1 ? "" : "s"} read`,
   );
   lines.push("");

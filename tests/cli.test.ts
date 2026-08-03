@@ -44,8 +44,8 @@ describe("cli scaffold", () => {
     expect(help).toContain("Run with no command for the dashboard");
   });
 
-  it("is named ccplus", () => {
-    expect(buildProgram().name()).toBe("ccplus");
+  it("is named ccvitals", () => {
+    expect(buildProgram().name()).toBe("ccvitals");
   });
 });
 
@@ -70,7 +70,7 @@ describe("option routing", () => {
       seen = command.optsWithGlobals();
     });
     await program.parseAsync([
-      "node", "ccplus", "sessions", "--json", "--limit", "3", "--since", "2026-01-01",
+      "node", "ccvitals", "sessions", "--json", "--limit", "3", "--since", "2026-01-01",
     ]);
     expect(seen).toMatchObject({ json: true, limit: "3", since: "2026-01-01" });
   });

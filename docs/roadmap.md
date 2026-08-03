@@ -21,7 +21,7 @@ Each phase ships something usable on its own.
 - `pricing.json` + five-tier cost function (unknown models degrade gracefully;
   cache writes split 5m/1h per design.md)
 - Aggregators: session / day / project / model
-- Commands: `ccplus` (dashboard), `ccplus sessions`
+- Commands: `ccvitals` (dashboard), `ccvitals sessions`
 - Differentiator metrics: cache hit ratio, cost per tool category, subagent
   split, tool call/failure stats, time metrics (duration, turns, gaps)
 - `doctor` command (parse health: skipped lines, unknown models)
@@ -29,7 +29,7 @@ Each phase ships something usable on its own.
 - **Done when:** numbers match a manual spot-check against one real session.
   Checked 2026-07-18 against the test project session (52e94664): cost,
   every token tier, message count, tool calls, and duration matched a jq
-  cross check exactly. The flat count said 7 turns where ccplus said 6,
+  cross check exactly. The flat count said 7 turns where ccvitals said 6,
   and the extra line was a duplicated prompt on an abandoned branch, so
   the tree aware number is the correct one.
 - *Already a usable tool at this point.*
@@ -105,6 +105,23 @@ to 4,845 and tests from 4,308 to 4,243.
 - **The hidden `watch` alias.** It preserved muscle memory for a command that
   was never published, so there was nothing to preserve.
 
+### Renamed again, to ccvitals (2026-08-02)
+
+`ccplus` cannot be published. npm compares names with the punctuation taken
+out, and `cc-plus` already exists, so the registry answers a publish with a
+403 and a suggestion to go scoped. Nothing about the package was wrong: the
+name was free, it just was not allowed.
+
+Worth knowing for any future rename, because the check does not run until the
+upload itself. `npm view <name>` returning nothing only says the name is
+unused. To know a name is allowed, check the hyphenated and underscored
+spellings too, and the singular, since all of them collapse to the same string.
+`ccprism` failed that test on `cc-prism`, and so did most of the short names
+worth having.
+
+The local checkout directory still stays at `ccprism`, for the same reason as
+before. The GitHub repo and the npm package are both `ccvitals`.
+
 ## Plugin plan (spec of 2026-07-21)
 
 Everything above stays. This is what comes next, and it supersedes the
@@ -146,7 +163,7 @@ commands on the side. One binary, four integration surfaces.
 - **Done when:** the help fits one screen, the merged follow modes behave the
   same as the commands they replace, and the new flags have tests.
 
-### P2. `ccplus context [id]` (shipped 2026-08-01)
+### P2. `ccvitals context [id]` (shipped 2026-08-01)
 
 Answers "what is filling the context window right now". Attributes active
 branch tokens by origin: file reads grouped per path, tool output by category,
@@ -155,7 +172,7 @@ consumers with tokens, share of the window, and how many times each file was
 touched. Where the log only gives text the number is estimated and marked with
 `~`, never presented as exact. `--json` and `--window <tokens>`.
 
-This is the feature that makes people pick ccplus over a pure cost reporter.
+This is the feature that makes people pick ccvitals over a pure cost reporter.
 
 Built as specced with four changes, all forced by what the logs actually hold.
 The full write up is in docs/design.md; the short version:
@@ -189,7 +206,7 @@ real logs, and should be checked.
 
 ### P3. Hooks
 
-A hidden `ccplus hook <event>` reads the hook JSON on stdin, resolves the
+A hidden `ccvitals hook <event>` reads the hook JSON on stdin, resolves the
 session through `transcript_path`, and dispatches per event: Stop prints the
 turn cost delta and the new fill, plus a warning naming the top three
 consumers when fill crosses a threshold; PostToolUse warns when a result added
@@ -211,15 +228,15 @@ things to guess.
 wrappers that run the CLI with `--no-color`. A `plugin/` directory in the repo
 holds the manifest, hook registrations, command files, and the statusline
 entry, so it installs as one plugin. For people not using plugins,
-`ccplus install` and `ccplus uninstall` write and remove the same entries in
+`ccvitals install` and `ccvitals uninstall` write and remove the same entries in
 `~/.claude`, printing every path they touch.
 
-This amends the read only promise, on purpose: ccplus never writes outside
-its install unless you run `ccplus install`.
+This amends the read only promise, on purpose: ccvitals never writes outside
+its install unless you run `ccvitals install`.
 
 ### P5. MCP server (optional, last)
 
-`ccplus mcp`, a stdio server exposing read only `get_session_cost`,
+`ccvitals mcp`, a stdio server exposing read only `get_session_cost`,
 `get_context_breakdown`, `get_wasted_spend`, and `search_sessions(query)`, so
 Claude itself can notice that context is mostly stale file reads and act on
 it. Only after P1 through P4 are stable.
@@ -246,7 +263,7 @@ back to two rows on an API plan.
 | Thinking | `thinking.enabled` | did not earn a badge next to effort |
 | Git + PR | `workspace.repo.name`, `git_worktree`, `pr.number`, `pr.review_state` | |
 
-**ccplus-only — from our own parse, and the actual differentiator:**
+**ccvitals-only — from our own parse, and the actual differentiator:**
 
 | Metric | Notes |
 |---|---|
@@ -276,7 +293,7 @@ below.
 
 | # | Idea | Verdict |
 |---|---|---|
-| 1 | `ccplus top`, live view of every running session | Build as described |
+| 1 | `ccvitals top`, live view of every running session | Build as described |
 | 2 | Real diff rendering in `view --full` | Build as described |
 | 3 | Blocks report for the 5 hour window | Needs a workaround, and one decision |
 | 4 | `daily` / `weekly` / `monthly` with `--breakdown` | Adds to work already scheduled |
@@ -298,7 +315,7 @@ up: item 2 first because the data is already there and it is self contained,
 then item 1 as the bigger piece, then 4 and 6 folded into the Phase 1 work
 they extend.
 
-**1. `ccplus top`, a live view of every running session.** The strongest of
+**1. `ccvitals top`, a live view of every running session.** The strongest of
 the batch and the cleanest fit. One foreground process polling the log
 directory, so no daemon, no state file, nothing written. Shows every session
 with recent activity as a row: cost, context fill, last activity, model.

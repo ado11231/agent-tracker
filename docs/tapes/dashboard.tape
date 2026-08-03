@@ -1,7 +1,7 @@
 # The hero image: a year of daily cost, then spend by project and model.
 #
 # Rendered by scripts/record.sh, which builds the demo sessions and
-# points ccplus at them. Never records against real logs.
+# points ccvitals at them. Never records against real logs.
 #
 #   vhs docs/tapes/dashboard.tape
 
@@ -33,7 +33,7 @@ Hide
 Type "clear" Enter
 Show
 
-Type "ccplus --span year"
+Type "ccvitals --span year"
 Sleep 700ms
 Enter
 Sleep 4s

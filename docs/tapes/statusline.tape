@@ -27,7 +27,7 @@ Hide
 Type "clear" Enter
 Show
 
-Type "ccplus statusline"
+Type "ccvitals statusline"
 Sleep 700ms
 Enter
 Sleep 3s

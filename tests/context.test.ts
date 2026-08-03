@@ -320,7 +320,7 @@ describe("runContext", () => {
   }
 
   async function makeRoot(): Promise<string> {
-    const root = await mkdtemp(join(tmpdir(), "ccplus-context-"));
+    const root = await mkdtemp(join(tmpdir(), "ccvitals-context-"));
     const project = join(root, "-scrubbed-project");
     await mkdir(project);
     await copyFile(

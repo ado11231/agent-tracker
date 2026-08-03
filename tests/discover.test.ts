@@ -8,12 +8,12 @@ import {
 } from "../src/parser/discover.js";
 
 async function makeRoot(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "ccplus-discover-"));
+  return mkdtemp(join(tmpdir(), "ccvitals-discover-"));
 }
 
 describe("discoverSessionFiles", () => {
   it("returns an empty list for a missing root", async () => {
-    const files = await discoverSessionFiles("/nonexistent/ccplus-test-root");
+    const files = await discoverSessionFiles("/nonexistent/ccvitals-test-root");
     expect(files).toEqual([]);
   });
 
@@ -45,27 +45,27 @@ describe("discoverSessionFiles", () => {
 });
 
 describe("defaultProjectsRoot", () => {
-  const original = process.env.CCPLUS_ROOT;
+  const original = process.env.CCVITALS_ROOT;
 
   afterEach(() => {
-    if (original === undefined) delete process.env.CCPLUS_ROOT;
-    else process.env.CCPLUS_ROOT = original;
+    if (original === undefined) delete process.env.CCVITALS_ROOT;
+    else process.env.CCVITALS_ROOT = original;
   });
 
   it("points at Claude Code's own directory by default", () => {
-    delete process.env.CCPLUS_ROOT;
+    delete process.env.CCVITALS_ROOT;
     expect(defaultProjectsRoot()).toMatch(/\.claude\/projects$/);
   });
 
   // The escape hatch the README recordings use, so demo sessions can
   // stand in for real ones without a flag on every command.
-  it("follows CCPLUS_ROOT when it names somewhere", () => {
-    process.env.CCPLUS_ROOT = "/tmp/ccplus-demo";
-    expect(defaultProjectsRoot()).toBe("/tmp/ccplus-demo");
+  it("follows CCVITALS_ROOT when it names somewhere", () => {
+    process.env.CCVITALS_ROOT = "/tmp/ccvitals-demo";
+    expect(defaultProjectsRoot()).toBe("/tmp/ccvitals-demo");
   });
 
-  it("ignores an empty CCPLUS_ROOT rather than reading the filesystem root", () => {
-    process.env.CCPLUS_ROOT = "";
+  it("ignores an empty CCVITALS_ROOT rather than reading the filesystem root", () => {
+    process.env.CCVITALS_ROOT = "";
     expect(defaultProjectsRoot()).toMatch(/\.claude\/projects$/);
   });
 });

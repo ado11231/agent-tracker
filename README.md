@@ -1,26 +1,26 @@
-<h3 align="center">ccplus</h3>
+<h3 align="center">ccvitals</h3>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/ccplus"><img src="https://img.shields.io/npm/v/ccplus?style=flat&color=CB3837&logo=npm&logoColor=white" alt="npm version"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/ccplus?style=flat&color=5FA04E&logo=nodedotjs&logoColor=white" alt="Node version"></a>
+  <a href="https://www.npmjs.com/package/ccvitals"><img src="https://img.shields.io/npm/v/ccvitals?style=flat&color=CB3837&logo=npm&logoColor=white" alt="npm version"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/ccvitals?style=flat&color=5FA04E&logo=nodedotjs&logoColor=white" alt="Node version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat" alt="MIT license"></a>
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ado11231/ccplus/main/docs/images/dashboard.png" alt="The ccplus dashboard: a year of daily cost as a contribution graph, then spend by project, model, and tool">
+  <img src="https://raw.githubusercontent.com/ado11231/ccvitals/main/docs/images/dashboard.png" alt="The ccvitals dashboard: a year of daily cost as a contribution graph, then spend by project, model, and tool">
 </p>
 
 <p align="center"><b>Where your Claude Code money went.</b></p>
 
 <p align="center">
-  Claude Code already writes a log for every session. ccplus just reads them.
+  Claude Code already writes a log for every session. ccvitals just reads them.
   Nothing leaves your machine, nothing is written outside its own install,
   and uninstalling leaves no trace.
 </p>
 
 ```bash
-npx ccplus              # try it
-npm install -g ccplus   # keep it
+npx ccvitals              # try it
+npm install -g ccvitals   # keep it
 ```
 
 Needs Node 20 or newer.
@@ -31,22 +31,22 @@ While a session is running:
 
 | | |
 | --- | --- |
-| `ccplus statusline` | a panel for Claude Code's status line |
-| `ccplus context` | what is filling the context window |
+| `ccvitals statusline` | a panel for Claude Code's status line |
+| `ccvitals context` | what is filling the context window |
 
 Afterwards:
 
 | | |
 | --- | --- |
-| `ccplus` | where the money went, today and this week |
-| `ccplus sessions` | recent sessions with cost, duration, and turns |
-| `ccplus doctor` | anything it could not parse or price |
+| `ccvitals` | where the money went, today and this week |
+| `ccvitals sessions` | recent sessions with cost, duration, and turns |
+| `ccvitals doctor` | anything it could not parse or price |
 
 ## Context
 
 Your status line says the window is 91% gone. This says what took it.
 
-![The context report: a fill gauge, an exact startup line, then the top consumers with estimated tokens and how many times each file was touched](https://raw.githubusercontent.com/ado11231/ccplus/main/docs/images/context.gif)
+![The context report: a fill gauge, an exact startup line, then the top consumers with estimated tokens and how many times each file was touched](https://raw.githubusercontent.com/ado11231/ccvitals/main/docs/images/context.gif)
 
 What you are hunting for is a file read many times over. Each read puts the
 same bytes in the window again, and the count on the right makes that visible.
@@ -58,13 +58,13 @@ of the window the log could actually see. The
 
 ## Dashboard and sessions
 
-`ccplus` on its own gives the image at the top of this page: today and this
+`ccvitals` on its own gives the image at the top of this page: today and this
 week, then totals by project, model and tool. `--span year` adds the
 contribution graph: one square per day, tinted by whichever model spent the
 most on it and brightening with how much. Piped or under `NO_COLOR`, where
 brightness cannot say it, the squares become a shade ramp that can.
 
-`ccplus sessions` lists them newest first. `--grep` searches what you typed
+`ccvitals sessions` lists them newest first. `--grep` searches what you typed
 and shows the line that matched.
 
 ## Statusline
@@ -74,10 +74,10 @@ how much quota is left. **Wasted** is what you paid for retries and abandoned
 branches. The **cache** share is usually the difference between a cheap
 session and an expensive one.
 
-![The statusline panel: model and turn count, then cost with the wasted spend beside it, then a context gauge and a cache hit gauge](https://raw.githubusercontent.com/ado11231/ccplus/main/docs/images/statusline.png)
+![The statusline panel: model and turn count, then cost with the wasted spend beside it, then a context gauge and a cache hit gauge](https://raw.githubusercontent.com/ado11231/ccvitals/main/docs/images/statusline.png)
 
 ```json
-{ "statusLine": { "type": "command", "command": "ccplus statusline" } }
+{ "statusLine": { "type": "command", "command": "ccvitals statusline" } }
 ```
 
 Goes in `~/.claude/settings.json`. If the bar comes up blank, use absolute
@@ -103,7 +103,7 @@ attention, and nothing else uses those two.
 
 ## When a number looks wrong
 
-Start with `ccplus doctor`. A model with no price still gets its tokens
+Start with `ccvitals doctor`. A model with no price still gets its tokens
 counted and its cost marked unknown rather than guessed at. Prices live in
 `src/cost/pricing.json`, one file keyed by model. Pull requests adding a new
 model are very welcome.

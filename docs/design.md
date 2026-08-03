@@ -231,8 +231,8 @@ row is yellow or red — those two stay reserved for failure and attention.
 
 ## 5. CLI surface (v1 — frozen)
 
-Install: `npx ccplus` (try it), `npm install -g ccplus` (keep it),
-`npm uninstall -g ccplus` (gone completely). Also works via `pnpm dlx` / `bunx`.
+Install: `npx ccvitals` (try it), `npm install -g ccvitals` (keep it),
+`npm uninstall -g ccvitals` (gone completely). Also works via `pnpm dlx` / `bunx`.
 
 Trust guarantees: only ever **reads** `~/.claude/projects/`; no network, no
 telemetry, no config file, no state; uninstall leaves zero trace.
@@ -245,17 +245,17 @@ same two groups.
 
 ```
 Live:
-ccplus statusline         cost, context, and rate limit panel for statusLine
-ccplus context [id]      what is filling the context window right now
+ccvitals statusline         cost, context, and rate limit panel for statusLine
+ccvitals context [id]      what is filling the context window right now
 
 Reports:
-ccplus                    dashboard: today / week, per project & model
-ccplus sessions           recent sessions: cost, duration, turns, model
-ccplus doctor             parse health: skipped lines, unknown model IDs
+ccvitals                    dashboard: today / week, per project & model
+ccvitals sessions           recent sessions: cost, duration, turns, model
+ccvitals doctor             parse health: skipped lines, unknown model IDs
 ```
 
 One of those is a feature rather than a command and so cannot appear in the
-grouped command list: the bare `ccplus` dashboard. It is covered by trailing
+grouped command list: the bare `ccvitals` dashboard. It is covered by trailing
 help text instead.
 
 Commander orders help groups by **first registration**, so the live commands
@@ -270,7 +270,7 @@ Built for Claude Code's `statusLine` setting, which runs a command after each
 assistant message and pipes session JSON on stdin (schema:
 code.claude.com/docs/en/statusline). The anchor field is
 `transcript_path` — it names the exact session file, so there is no guessing
-by mtime. We parse that file with the normal pipeline and print **ccplus's
+by mtime. We parse that file with the normal pipeline and print **ccvitals's
 own** cost, so the number matches the dashboard rather than echoing
 Claude Code's `cost.total_cost_usd`. Run from a shell with no piped input it
 falls back to the newest session, which makes it previewable.
@@ -327,7 +327,7 @@ still leads with a gauge rather than a lone number.
 
 `ctx` is the input side of the most recent main-thread API call (fresh input +
 cache reads + cache writes, output excluded — the same basis as Claude Code's
-`used_percentage`). The **token count is ccplus's own** so it agrees with
+`used_percentage`). The **token count is ccvitals's own** so it agrees with
 the dashboard; only the **window size** is taken from the session
 JSON (`context_window.context_window_size`). On a manual run no size is sent,
 so one is inferred: context above 200k proves the extended tier, and assuming
@@ -381,7 +381,7 @@ PATH — absolute paths in the `command` avoid a silently blank bar.
 Settings snippet:
 
 ```json
-{ "statusLine": { "type": "command", "command": "ccplus statusline" } }
+{ "statusLine": { "type": "command", "command": "ccvitals statusline" } }
 ```
 
 #### `context` (2026-08-01)
@@ -471,7 +471,7 @@ flag that swaps glyphs has to swap all of them or it is not worth having.
 wrong. `context` takes an optional `[id]` argument, an unambiguous session
 id prefix, defaulting to the newest session.
 
-Dashboard (bare `ccplus`) only: `--span week|month|year`, a single ladder
+Dashboard (bare `ccvitals`) only: `--span week|month|year`, a single ladder
 where each rung keeps what the one below showed. `week` (the default) is
 today and this week; `month` widens both rows to this week and this month;
 `year` keeps those and renders an activity heatmap of daily cost above them
@@ -506,7 +506,7 @@ going to reach the reader:
 
   The four steps come from **truecolor when the terminal announces it**
   (`COLORTERM`), and from the 16 color palette — dimmed, plain, bright,
-  bright bold — when it does not. This is the one place ccplus reaches past
+  bright bold — when it does not. This is the one place ccvitals reaches past
   16 colors, and it earns it: the 16 color ramp has to spend its bottom step
   on `dim`, and the bottom step is where most days land, so a quiet day came
   out duller than the grey of a day with no spend at all. The 24 bit ramps
@@ -595,10 +595,10 @@ four projects, a year of activity for the contribution graph, and one hand
 written session about a double applied discount code that the `context` image
 is taken from.
 
-ccplus finds them through `CCPLUS_ROOT`, the one env var it reads. That is an
+ccvitals finds them through `CCVITALS_ROOT`, the one env var it reads. That is an
 escape hatch and not configuration: there is nothing to set for normal use and
-no file anywhere remembers it. `scripts/record.sh` puts a shim named `ccplus`
-on PATH that pins the variable, so a tape typing `ccplus context` cannot reach
+no file anywhere remembers it. `scripts/record.sh` puts a shim named `ccvitals`
+on PATH that pins the variable, so a tape typing `ccvitals context` cannot reach
 real logs even if it is run by hand.
 
 **The hero gif is the exception to all of the above.** A recording of a real

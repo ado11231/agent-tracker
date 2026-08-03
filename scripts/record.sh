@@ -27,16 +27,16 @@ npm run build --silent
 echo "writing demo sessions..."
 node scripts/demo-sessions.mjs "$DEMO" >/dev/null
 
-# The tapes type "ccplus", not a path, so a shim goes on PATH ahead of
-# any real install. It also pins CCPLUS_ROOT, which is what keeps the
+# The tapes type "ccvitals", not a path, so a shim goes on PATH ahead of
+# any real install. It also pins CCVITALS_ROOT, which is what keeps the
 # recordings off the real logs even if someone runs a tape by hand.
 mkdir -p "$BIN"
-cat > "$BIN/ccplus" <<EOF
+cat > "$BIN/ccvitals" <<EOF
 #!/usr/bin/env bash
-export CCPLUS_ROOT="$DEMO"
+export CCVITALS_ROOT="$DEMO"
 exec node "$PWD/dist/main.js" "\$@"
 EOF
-chmod +x "$BIN/ccplus"
+chmod +x "$BIN/ccvitals"
 export PATH="$BIN:$PATH"
 
 mkdir -p docs/images
