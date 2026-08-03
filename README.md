@@ -1,12 +1,22 @@
-# ccplus
+<h3 align="center">ccplus</h3>
 
-Where your Claude Code money went.
+<p align="center">
+  <a href="https://www.npmjs.com/package/ccplus"><img src="https://img.shields.io/npm/v/ccplus?style=flat&color=CB3837&logo=npm&logoColor=white" alt="npm version"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/ccplus?style=flat&color=5FA04E&logo=nodedotjs&logoColor=white" alt="Node version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat" alt="MIT license"></a>
+</p>
 
-Claude Code already writes a log for every session. ccplus just reads them.
-Nothing is sent anywhere, nothing is written outside its own install, no config
-file. Uninstall it and there is no trace left.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ado11231/ccplus/main/docs/images/dashboard.png" alt="The ccplus dashboard: a year of daily cost as a contribution graph, then spend by project, model, and tool">
+</p>
 
-![The ccplus dashboard: a year of daily cost as a contribution graph, then spend by project, model, and tool](https://raw.githubusercontent.com/ado11231/ccplus/main/docs/images/dashboard.png)
+<p align="center"><b>Where your Claude Code money went.</b></p>
+
+<p align="center">
+  Claude Code already writes a log for every session. ccplus just reads them.
+  Nothing leaves your machine, nothing is written outside its own install,
+  and uninstalling leaves no trace.
+</p>
 
 ```bash
 npx ccplus              # try it
@@ -76,20 +86,20 @@ managed `node`. Rate limits need a Pro or Max plan.
 
 ## Flags
 
-`--json` and `--no-color` work everywhere. `--project`, `--since` and `--until`
-narrow the reports. The rest belong to one command each:
+`--json` and `--no-color` work on every command, and `--project`, `--since`
+and `--until` narrow any of the reports. The rest belong to one command each:
 
 | | |
 | --- | --- |
-| `--span week\|month\|year` | dashboard |
+| `--span` | dashboard, one of week, month or year |
 | `--limit`, `--model`, `--grep` | `sessions` |
 | `--window <tokens>` | `context` |
-| `--ascii` | everywhere but `sessions`, which prints no glyphs |
+| `--ascii` | everywhere except `sessions`, which prints no glyphs |
 
-Color never carries meaning on its own. It only repeats something a glyph, a
-column or a heading already said, so `NO_COLOR`, `--no-color` and piping to a
-file all read the same. Red means it failed and yellow wants your attention,
-everywhere, and nothing else uses those two.
+Color never carries meaning on its own. It repeats what a glyph, a column or a
+heading already said, so `NO_COLOR`, `--no-color` and piping to a file all read
+the same. Red always means something failed, yellow always wants your
+attention, and nothing else uses those two.
 
 ## When a number looks wrong
 
