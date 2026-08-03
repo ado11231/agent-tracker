@@ -6,7 +6,7 @@ Claude Code already writes a log for every session. ccplus just reads them.
 Nothing is sent anywhere, nothing is written outside its own install, no config
 file. Uninstall it and there is no trace left.
 
-![The ccplus dashboard: a year of daily cost as a contribution graph, then spend by project, model, and tool](docs/images/dashboard.png)
+![The ccplus dashboard: a year of daily cost as a contribution graph, then spend by project, model, and tool](https://raw.githubusercontent.com/ado11231/ccplus/main/docs/images/dashboard.png)
 
 ```bash
 npx ccplus              # try it
@@ -36,7 +36,7 @@ Afterwards:
 
 Your status line says the window is 91% gone. This says what took it.
 
-![The context report: a fill gauge, an exact startup line, then the top consumers with estimated tokens and how many times each file was touched](docs/images/context.gif)
+![The context report: a fill gauge, an exact startup line, then the top consumers with estimated tokens and how many times each file was touched](https://raw.githubusercontent.com/ado11231/ccplus/main/docs/images/context.gif)
 
 What you are hunting for is a file read many times over. Each read puts the
 same bytes in the window again, and the count on the right makes that visible.
@@ -64,7 +64,7 @@ how much quota is left. **Wasted** is what you paid for retries and abandoned
 branches. The **cache** share is usually the difference between a cheap
 session and an expensive one.
 
-![The statusline panel: session name and model, then cost, then a context gauge, then a quota gauge](docs/images/statusline.png)
+![The statusline panel: model and turn count, then cost with the wasted spend beside it, then a context gauge and a cache hit gauge](https://raw.githubusercontent.com/ado11231/ccplus/main/docs/images/statusline.png)
 
 ```json
 { "statusLine": { "type": "command", "command": "ccplus statusline" } }

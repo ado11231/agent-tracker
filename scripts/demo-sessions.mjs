@@ -15,7 +15,7 @@
 //
 // Defaults to .demo/projects, which is gitignored.
 
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -96,6 +96,36 @@ export function buildSession({ sessionId, cwd, model, start, turns, random }) {
         name: call.tool,
         input: call.input,
       });
+    }
+
+    // An abandoned attempt: it hangs off the same parent as the real
+    // reply, and nothing is ever chained onto it, so the walk from
+    // leafUuid never reaches it. That is exactly the shape a retry or
+    // an interrupted answer leaves in a real log, and it is what the
+    // wasted figure is counting.
+    if (turn.abandoned) {
+      const fork = parent;
+      clock = addMinutes(clock, 1);
+      push({
+        type: "assistant",
+        message: {
+          id: `msg_${randomUUID().replace(/-/g, "").slice(0, 20)}`,
+          role: "assistant",
+          model,
+          content: [{ type: "text", text: turn.abandoned.say }],
+          usage: {
+            input_tokens: 2,
+            output_tokens: turn.abandoned.output,
+            cache_read_input_tokens: context,
+            cache_creation_input_tokens: turn.abandoned.tokens,
+            cache_creation: {
+              ephemeral_5m_input_tokens: 0,
+              ephemeral_1h_input_tokens: turn.abandoned.tokens,
+            },
+          },
+        },
+      });
+      parent = fork;
     }
 
     const added = turn.tokens ?? 1500 + Math.floor(random() * 4000);
@@ -226,6 +256,13 @@ function featureSession(project) {
       },
       {
         prompt: "fix it and add a test for the double apply case",
+        // Interrupted and retried, which is where the wasted figure on
+        // the statusline comes from.
+        abandoned: {
+          say: "I'll guard against a second call by tracking which codes have already been applied on the cart.",
+          tokens: 5200,
+          output: 1400,
+        },
         say: "Making `applyDiscount` pure, then covering the repeat case.",
         calls: [
           edit(`${project.cwd}/src/pricing/discount.ts`, 2400),
@@ -302,6 +339,7 @@ async function main() {
   await rm(OUT, { recursive: true, force: true });
 
   let files = 0;
+  let featurePath;
   for (const project of PROJECTS) {
     const dir = join(OUT, project.slug);
     await mkdir(dir, { recursive: true });
@@ -309,7 +347,8 @@ async function main() {
 
     if (project.name === "checkout-api") {
       const content = featureSession(project);
-      await writeFile(join(dir, "8b8c2bdf-1f00-4a8c-a0c1-dfa7fd1586a2.jsonl"), content);
+      featurePath = join(dir, "8b8c2bdf-1f00-4a8c-a0c1-dfa7fd1586a2.jsonl");
+      await writeFile(featurePath, content);
       files += 1;
     }
 
@@ -317,6 +356,20 @@ async function main() {
       await writeFile(join(dir, `${session.sessionId}.jsonl`), session.content);
       files += 1;
     }
+  }
+
+  // ccplus resolves "the latest session" by file mtime, and the filler
+  // is written after the feature session, so without this the context
+  // and statusline images land on whichever throwaway session happened
+  // to be written last. That is usually a one turn session with an
+  // empty context window, which is the opposite of what those two
+  // images exist to show.
+  // A whole minute ahead, not a millisecond: every file here is written
+  // inside the same second, and a tie is broken by directory order
+  // rather than by anything we control.
+  if (featurePath !== undefined) {
+    const ahead = new Date(Date.now() + 60_000);
+    await utimes(featurePath, ahead, ahead);
   }
 
   console.log(`wrote ${files} demo sessions to ${OUT}`);

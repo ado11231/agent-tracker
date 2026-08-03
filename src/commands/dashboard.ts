@@ -502,8 +502,9 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
   if (subagents.messages > 0 || retries.messages > 0) {
     lines.push(
       `  ${c.dim("of the total:")} subagents ${fmtUsd(subagents.usd)}` +
-        ` (${subagents.messages} msgs) ${g.dot} retries ${fmtUsd(retries.usd)}` +
-        ` (${retries.messages} msgs)`,
+        ` (${subagents.messages} msg${subagents.messages === 1 ? "" : "s"})` +
+        ` ${g.dot} retries ${fmtUsd(retries.usd)}` +
+        ` (${retries.messages} msg${retries.messages === 1 ? "" : "s"})`,
     );
   }
   lines.push("");
