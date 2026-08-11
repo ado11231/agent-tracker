@@ -18,6 +18,13 @@ if ! command -v vhs >/dev/null 2>&1; then
   exit 1
 fi
 
+# ffmpeg comes with vhs, which needs it to write frames. The heatmap
+# image is a crop, so this checks for it rather than assuming.
+if ! command -v ffmpeg >/dev/null 2>&1; then
+  echo "ffmpeg is not installed. brew install ffmpeg" >&2
+  exit 1
+fi
+
 DEMO="$PWD/.demo/projects"
 BIN="$PWD/.demo/bin"
 
@@ -43,7 +50,7 @@ mkdir -p docs/images
 
 wanted=("$@")
 if [ ${#wanted[@]} -eq 0 ]; then
-  wanted=(dashboard context statusline)
+  wanted=(heatmap dashboard context statusline)
 fi
 
 for name in "${wanted[@]}"; do
@@ -55,6 +62,22 @@ for name in "${wanted[@]}"; do
 
   echo "recording $name..."
   vhs "$tape"
+
+  # The heatmap tape records the whole year view, tables and all,
+  # because a terminal shorter than its output scrolls the top away and
+  # the top is the part being kept. So the cut happens here instead.
+  #
+  # 740 is the last row of the model legend. To work it out again after
+  # a layout change, open .demo/heatmap-full.png and find the first
+  # empty row under the legend. The pad puts the background back below the
+  # cut so the bottom margin matches the 48 above the first line, and
+  # 1c1c2c is what vhs renders Catppuccin Mocha's base as.
+  if [ "$name" = heatmap ]; then
+    echo "cropping heatmap..."
+    ffmpeg -y -v error -i .demo/heatmap-full.png \
+      -vf "crop=2020:740:0:0,pad=2020:768:0:0:0x1c1c2c" \
+      docs/images/heatmap.png
+  fi
 done
 
 echo "done. images are in docs/images/"

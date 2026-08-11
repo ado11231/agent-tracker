@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ado11231/ccvitals/main/docs/images/dashboard.png" alt="The ccvitals dashboard: a year of daily cost as a contribution graph, then spend by project, model, and tool">
+  <img src="https://raw.githubusercontent.com/ado11231/ccvitals/main/docs/images/heatmap.png" alt="A year of daily Claude Code cost as a contribution graph, one square per day, tinted by the model that spent the most that day">
 </p>
 
 <p align="center"><b>Where your Claude Code money went.</b></p>
@@ -58,11 +58,17 @@ of the window the log could actually see. The
 
 ## Dashboard & Sessions
 
-`ccvitals` on its own gives the image at the top of this page: today and this
-week, then totals by project, model and tool. `--span year` adds the
-contribution graph: one square per day, tinted by whichever model spent the
-most on it and brightening with how much. Piped or under `NO_COLOR`, where
-brightness cannot say it, the squares become a shade ramp that can.
+`ccvitals` on its own is today and this week, then totals by project, model
+and tool.
+
+<p align="center">
+  <img width="620" src="https://raw.githubusercontent.com/ado11231/ccvitals/main/docs/images/dashboard.png" alt="The ccvitals dashboard: today and this week, then spend by project, model and tool, each with a share bar">
+</p>
+
+`--span year` puts the graph at the top of this page above those tables: one
+square per day, tinted by whichever model spent the most on it and brightening
+with how much. Piped or under `NO_COLOR`, where brightness cannot say it, the
+squares become a shade ramp that can.
 
 `ccvitals sessions` lists them newest first. `--grep` searches what you typed
 and shows the line that matched.
