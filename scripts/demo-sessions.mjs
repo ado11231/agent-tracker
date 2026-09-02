@@ -6,7 +6,7 @@
 // page. Scrubbed fixtures cannot be used either, since every string in
 // them is a placeholder and the screenshots would read as nonsense.
 // So the demo data is written from scratch here, in the same shape the
-// real logs use, and ccvitals reads it through CCVITALS_ROOT.
+// real logs use, and AgentTracker reads it through its demo roots.
 //
 // Everything below is invented. Any resemblance to a real session is
 // the point, and a coincidence.
@@ -20,6 +20,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
 const OUT = process.argv[2] ?? join(process.cwd(), ".demo", "projects");
+const CODEX_OUT = join(OUT, "..", "codex");
 
 // Relative to the real clock, not a fixed date: the dashboard reads
 // the system clock for its today and this week rows, so demo data
@@ -337,6 +338,7 @@ function fillerSessions(project, random) {
 
 async function main() {
   await rm(OUT, { recursive: true, force: true });
+  await rm(CODEX_OUT, { recursive: true, force: true });
 
   let files = 0;
   let featurePath;
@@ -372,9 +374,34 @@ async function main() {
     await utimes(featurePath, ahead, ahead);
   }
 
+  // A small, separate Codex rollout for the live-panel recording. It
+  // follows Codex's cumulative token snapshots, so the real parser is
+  // exercised instead of faking its rendered output.
+  const codexDir = join(CODEX_OUT, "2026", "09", "02");
+  const codexId = "4b4f32d1-a8e0-4c7d-b039-bcb13a46fd2d";
+  const codexStart = new Date("2026-09-02T14:20:00Z");
+  const codexLines = [
+    { timestamp: iso(codexStart), type: "session_meta", payload: { session_id: codexId, cwd: "/Users/you/code/checkout-api", cli_version: "0.150.1", git: { branch: "main" } } },
+    { timestamp: iso(addMinutes(codexStart, 1)), type: "turn_context", payload: { model: "gpt-5-codex", cwd: "/Users/you/code/checkout-api" } },
+    { timestamp: iso(addMinutes(codexStart, 2)), type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "Track down the checkout total rounding error." }] } },
+    // Codex counts cached tokens inside input_tokens rather than
+    // beside it, and states both the live window and the plan limit on
+    // every snapshot. The demo follows that shape so the recording
+    // exercises the real parser instead of a flattering fiction.
+    { timestamp: iso(addMinutes(codexStart, 3)), type: "event_msg", payload: { type: "token_count", info: { total_token_usage: { input_tokens: 70_400, cached_input_tokens: 52_000, cache_write_input_tokens: 0, output_tokens: 1_240 }, last_token_usage: { input_tokens: 70_400, cached_input_tokens: 52_000, cache_write_input_tokens: 0, output_tokens: 1_240 }, model_context_window: 272_000 }, rate_limits: { primary: { used_percent: 18, window_minutes: 43_200 }, secondary: null } } },
+    { timestamp: iso(addMinutes(codexStart, 4)), type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "I found the rounding path and added coverage for it." }] } },
+    { timestamp: iso(addMinutes(codexStart, 5)), type: "event_msg", payload: { type: "token_count", info: { total_token_usage: { input_tokens: 164_900, cached_input_tokens: 138_400, cache_write_input_tokens: 0, output_tokens: 2_180 }, last_token_usage: { input_tokens: 94_500, cached_input_tokens: 86_400, cache_write_input_tokens: 0, output_tokens: 940 }, model_context_window: 272_000 }, rate_limits: { primary: { used_percent: 34, window_minutes: 43_200 }, secondary: null } } },
+  ];
+  await mkdir(codexDir, { recursive: true });
+  const codexPath = join(codexDir, `rollout-2026-09-02T14-20-00-${codexId}.jsonl`);
+  await writeFile(codexPath, `${codexLines.map((line) => JSON.stringify(line)).join("\n")}\n`);
+  const codexAhead = new Date(Date.now() + 120_000);
+  await utimes(codexPath, codexAhead, codexAhead);
+
   console.log(`wrote ${files} demo sessions to ${OUT}`);
-  console.log("point ccvitals at them with:");
-  console.log(`  CCVITALS_ROOT=${OUT} node dist/main.js`);
+  console.log(`wrote Codex demo session to ${CODEX_OUT}`);
+  console.log("point AgentTracker at them with:");
+  console.log(`  AGENTTRACKER_CLAUDE_ROOT=${OUT} AGENTTRACKER_CODEX_ROOT=${CODEX_OUT} node dist/main.js`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) await main();

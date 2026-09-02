@@ -26,6 +26,7 @@ if ! command -v ffmpeg >/dev/null 2>&1; then
 fi
 
 DEMO="$PWD/.demo/projects"
+CODEX_DEMO="$PWD/.demo/codex"
 BIN="$PWD/.demo/bin"
 
 echo "building..."
@@ -34,23 +35,24 @@ npm run build --silent
 echo "writing demo sessions..."
 node scripts/demo-sessions.mjs "$DEMO" >/dev/null
 
-# The tapes type "ccvitals", not a path, so a shim goes on PATH ahead of
-# any real install. It also pins CCVITALS_ROOT, which is what keeps the
+# The tapes type "agenttracker", not a path, so a shim goes on PATH ahead of
+# any real install. It also pins the demo roots, which is what keeps the
 # recordings off the real logs even if someone runs a tape by hand.
 mkdir -p "$BIN"
-cat > "$BIN/ccvitals" <<EOF
+cat > "$BIN/agenttracker" <<EOF
 #!/usr/bin/env bash
-export CCVITALS_ROOT="$DEMO"
+export AGENTTRACKER_CLAUDE_ROOT="$DEMO"
+export AGENTTRACKER_CODEX_ROOT="$CODEX_DEMO"
 exec node "$PWD/dist/main.js" "\$@"
 EOF
-chmod +x "$BIN/ccvitals"
+chmod +x "$BIN/agenttracker"
 export PATH="$BIN:$PATH"
 
 mkdir -p docs/images
 
 wanted=("$@")
 if [ ${#wanted[@]} -eq 0 ]; then
-  wanted=(heatmap dashboard context statusline)
+  wanted=(heatmap dashboard context statusline codex-live)
 fi
 
 for name in "${wanted[@]}"; do
@@ -75,7 +77,7 @@ for name in "${wanted[@]}"; do
   if [ "$name" = heatmap ]; then
     echo "cropping heatmap..."
     ffmpeg -y -v error -i .demo/heatmap-full.png \
-      -vf "crop=2020:740:0:0,pad=2020:768:0:0:0x1c1c2c" \
+      -vf "crop=2020:672:0:0,pad=2020:700:0:0:0x1c1c2c" \
       docs/images/heatmap.png
   fi
 done

@@ -32,7 +32,7 @@ Hide
 Type "clear" Enter
 Show
 
-Type "ccvitals"
+Type "agenttracker"
 Sleep 700ms
 Enter
 Sleep 4s
