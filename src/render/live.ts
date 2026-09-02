@@ -23,13 +23,29 @@ export interface CurrentContext {
   model: string | undefined;
 }
 
-export function currentContext(session: ExtractedSession): CurrentContext {
+export function currentContext(
+  session: ExtractedSession,
+  cumulativeSnapshots = false,
+): CurrentContext {
   let latest: (typeof session.usage)[number] | undefined;
   for (const entry of session.usage) {
     if (entry.isSidechain || !entry.onActiveBranch) continue;
     latest = entry;
   }
   if (latest === undefined) return { tokens: 0, model: undefined };
+  // Codex persists cumulative token snapshots. Its parser stores the
+  // deltas so costs aggregate correctly; adding those deltas back here
+  // recovers the current window rather than showing only the last turn.
+  if (cumulativeSnapshots) {
+    const tokens = session.usage
+      .filter((entry) => !entry.isSidechain && entry.onActiveBranch)
+      .reduce(
+        (sum, entry) =>
+          sum + entry.usage.input + entry.usage.cacheRead + entry.usage.cacheCreationTotal,
+        0,
+      );
+    return { tokens, model: latest.model };
+  }
   const u = latest.usage;
   return {
     tokens: u.input + u.cacheRead + u.cacheCreationTotal,
@@ -309,11 +325,11 @@ function limitsRow(
     const week = host.sevenDay;
     return panelRow(
       [
-        gauge("5h", ratio, paint, options),
+        gauge(host.fiveHour.label ?? "5h", ratio, paint, options),
         week === undefined
           ? undefined
           : fillPaint(c, week.usedPercentage / 100)(
-              `${pct(week.usedPercentage / 100)} week`,
+              `${pct(week.usedPercentage / 100)} ${week.label ?? "week"}`,
             ),
         cacheText,
       ],

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseCodexSessionFile } from "../src/parser/codex.js";
+import { currentContext } from "../src/render/live.js";
 
 describe("parseCodexSessionFile", () => {
   it("converts cumulative token snapshots into per-turn usage", async () => {
@@ -19,7 +20,19 @@ describe("parseCodexSessionFile", () => {
     const parsed = await parseCodexSessionFile(path);
     expect(parsed.session.meta).toMatchObject({ sessionId: "12345678-1234-1234-1234-123456789abc", cwd: "/work/app", gitBranch: "main", models: ["gpt-5-codex"] });
     expect(parsed.session.usage).toHaveLength(2);
-    expect(parsed.session.usage.map((entry) => entry.usage.input)).toEqual([100, 50]);
+    // Codex nests cache reads inside input_tokens, so fresh input is
+    // input_tokens minus cached_input_tokens: 100 - 20 and then the
+    // delta of 150 - 30 against it. Billing the raw input_tokens would
+    // charge the cached half twice.
+    expect(parsed.session.usage.map((entry) => entry.usage.input)).toEqual([80, 40]);
+    expect(parsed.session.usage.map((entry) => entry.usage.cacheRead)).toEqual([20, 10]);
     expect(parsed.session.usage.map((entry) => entry.usage.output)).toEqual([30, 20]);
+    // Codex's on-disk counters are cumulative. The live panel restores
+    // that latest context total from the parser's cost-safe deltas:
+    // 120 fresh input, 30 cache reads and 12 cache writes.
+    expect(currentContext(parsed.session, true)).toEqual({
+      tokens: 162,
+      model: "gpt-5-codex",
+    });
   });
 });

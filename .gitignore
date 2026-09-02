@@ -4,3 +4,6 @@ dist/
 # Generated demo sessions for the README images. Rebuilt by
 # scripts/demo-sessions.mjs, never committed.
 .demo/
+
+# Local Codex hook wiring, machine specific
+.codex/

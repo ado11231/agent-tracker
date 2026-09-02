@@ -10,6 +10,7 @@ import { runDoctor } from "./commands/doctor.js";
 import { runSessions } from "./commands/sessions.js";
 import { runStatusline } from "./commands/statusline.js";
 import { runLive } from "./commands/live.js";
+import { runHook } from "./commands/hook.js";
 import type { CommandFlags } from "./commands/load.js";
 
 // Help group headings. Live commands run beside a session in
@@ -92,6 +93,15 @@ export function buildProgram(): Command {
       process.exitCode = await runStatusline(toFlags(opts));
     });
 
+  withCommonFlags(program.command("hook"))
+    .option("--ascii", "swap unicode glyphs for ascii")
+    .helpGroup(LIVE)
+    .description("Same panel for Codex, printed by a Codex Stop hook")
+    .action(async (_opts: RawOpts, command: Command) => {
+      const opts = command.optsWithGlobals() as RawOpts;
+      process.exitCode = await runHook(toFlags(opts));
+    });
+
   withCommonFlags(program.command("context"))
     .option("--ascii", "swap unicode glyphs for ascii")
     .helpGroup(LIVE)
@@ -121,7 +131,7 @@ export function buildProgram(): Command {
     .option("--id <session>", "session id prefix")
     .option("--refresh <seconds>", "refresh interval; 0 prints once")
     .helpGroup(LIVE)
-    .description("Track the latest local Claude Code or Codex session")
+    .description("Track the latest local Claude Code or Codex session (Codex: companion panel)")
     .action(async (_opts: RawOpts, command: Command) => {
       const opts = command.optsWithGlobals() as RawOpts;
       const refresh = opts.refresh === undefined ? undefined : Number(opts.refresh);

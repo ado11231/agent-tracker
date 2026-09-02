@@ -28,7 +28,12 @@ export type Target =
 // one.
 export async function resolveTarget(flags: TargetFlags): Promise<Target> {
   const source = flags.source ?? (flags.root === undefined ? "auto" : "claude");
-  const files = await discoverFiles(source, flags.root === undefined ? undefined : { claude: flags.root });
+  const roots = flags.root === undefined
+    ? undefined
+    : source === "codex"
+      ? { codex: flags.root }
+      : { claude: flags.root };
+  const files = await discoverFiles(source, roots);
 
   let candidates = files;
   if (flags.id !== undefined) {
