@@ -80,6 +80,20 @@ for name in "${wanted[@]}"; do
       -vf "crop=2020:672:0:0,pad=2020:700:0:0:0x1c1c2c" \
       docs/images/heatmap.png
   fi
+
+  # Cut the panel out of the Codex session, dropping the banner, the
+  # exchange above it and Codex's own "Stop (completed) says:" label,
+  # which is its framing rather than part of the panel.
+  #
+  # 570 is the first row of the panel and 136 covers its four rows. To
+  # work these out again after a Codex layout change, open
+  # .demo/codex-full.png and find the row where the model name starts.
+  if [ "$name" = codex-live ]; then
+    echo "cropping codex panel..."
+    ffmpeg -y -v error -i .demo/codex-full.png \
+      -vf "crop=1704:136:96:570,pad=1800:200:48:32:0x1c1c2c" \
+      docs/images/codex-live.png
+  fi
 done
 
 echo "done. images are in docs/images/"
