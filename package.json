@@ -1,5 +1,5 @@
 {
-  "name": "agenttracker",
+  "name": "@ado11231/agenttracker",
   "version": "0.1.0",
   "description": "Local token metrics for Claude Code and Codex sessions",
   "keywords": [
@@ -56,5 +56,8 @@
   },
   "overrides": {
     "esbuild": "^0.28.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
