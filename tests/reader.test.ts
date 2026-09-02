@@ -77,6 +77,34 @@ describe("classifyLines", () => {
     expect(result.stats.unknownTypes).toEqual({});
   });
 
+  // Session bookkeeping Claude Code writes alongside the transcript.
+  // None of it carries usage or a parentUuid, so it is dropped rather
+  // than reported: before this, a normal session raised warnings for
+  // lines that were never going to matter, which buried the warnings
+  // that do.
+  it("drops session bookkeeping without flagging it", async () => {
+    const result = await classifyLines([
+      line({ type: "atis-latch", atis: "x" }),
+      line({ type: "bridge-session", bridgeSessionId: "b1" }),
+      line({ type: "frame-link", frameUrl: "https://example.test", title: "t" }),
+      line({ type: "artifact-comment-monitor", artifacts: [] }),
+      line({ type: "artifact-autoreact-ledger", artifacts: [] }),
+    ]);
+    expect(result.lines).toHaveLength(0);
+    expect(result.stats.ignoredLines).toBe(5);
+    expect(result.stats.unknownTypes).toEqual({});
+  });
+
+  // cost-state carries Claude Code's own totalCostUSD and modelUsage,
+  // which the tool does not read yet. It stays unknown on purpose, so
+  // doctor keeps naming the gap instead of hiding it.
+  it("keeps flagging cost-state, which holds data we do not read", async () => {
+    const result = await classifyLines([
+      line({ type: "cost-state", totalCostUSD: 1.23, modelUsage: {} }),
+    ]);
+    expect(result.stats.unknownTypes).toEqual({ "cost-state": 1 });
+  });
+
   it("counts malformed lines instead of throwing", async () => {
     const result = await classifyLines([
       "{ not json at all",

@@ -16,14 +16,25 @@ const KNOWN_TYPES = new Set([
 const IGNORED_TYPES = new Set([
   "agent-name",
   "ai-title",
+  "artifact-autoreact-ledger",
+  "artifact-comment-monitor",
+  "atis-latch",
+  "bridge-session",
   "file-history-delta",
   "file-history-snapshot",
+  "frame-link",
   "mode",
   "permission-mode",
   "pr-link",
   "queue-operation",
   "summary",
 ]);
+
+// Deliberately absent from both lists above: "cost-state", which
+// carries Claude Code's own totalCostUSD, modelUsage and line counts
+// for the session. That is real data the tool does not read yet, so it
+// stays unknown and keeps showing up in doctor, which is what doctor
+// is for. Silencing it would hide the gap rather than close it.
 
 function emptyStats(): ReadStats {
   return {
