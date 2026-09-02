@@ -1,12 +1,11 @@
 import { resolve } from "node:path";
 import { summarizeSession } from "../cost/aggregate.js";
 import {
-  defaultProjectsRoot,
-  discoverSessionFiles,
+  discoverFiles,
   type SessionFile,
 } from "../parser/discover.js";
 import type { ExtractedSession } from "../parser/events.js";
-import { parseSessionFile } from "../parser/session.js";
+import { parseDiscoveredSession } from "../parser/session.js";
 
 // The fields session resolution needs. Shared by every report that
 // opens a single session by id rather than scanning the whole root.
@@ -14,6 +13,7 @@ export interface TargetFlags {
   id: string | undefined;
   project: string | undefined;
   root?: string;
+  source?: import("../parser/discover.js").SessionSource;
 }
 
 export type Target =
@@ -27,7 +27,8 @@ export type Target =
 // files with only bookkeeping lines, and the newest file is often
 // one.
 export async function resolveTarget(flags: TargetFlags): Promise<Target> {
-  const files = await discoverSessionFiles(flags.root ?? defaultProjectsRoot());
+  const source = flags.source ?? (flags.root === undefined ? "auto" : "claude");
+  const files = await discoverFiles(source, flags.root === undefined ? undefined : { claude: flags.root });
 
   let candidates = files;
   if (flags.id !== undefined) {
@@ -46,7 +47,7 @@ export async function resolveTarget(flags: TargetFlags): Promise<Target> {
     flags.project === undefined ? undefined : resolve(flags.project);
 
   for (const file of candidates) {
-    const parsed = await parseSessionFile(file.filePath);
+    const parsed = await parseDiscoveredSession(file);
     if (wantedCwd !== undefined) {
       const summary = summarizeSession(file, parsed.session);
       if (summary.cwd !== wantedCwd) continue;

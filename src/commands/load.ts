@@ -1,12 +1,12 @@
 import { resolve } from "node:path";
 import { summarizeSession, type SessionSummary } from "../cost/aggregate.js";
 import {
-  defaultProjectsRoot,
-  discoverSessionFiles,
+  discoverFiles,
+  type SessionSource,
   type SessionFile,
 } from "../parser/discover.js";
 import type { ExtractedSession, MessageUsage } from "../parser/events.js";
-import { parseSessionFile } from "../parser/session.js";
+import { parseDiscoveredSession } from "../parser/session.js";
 import type { TreeStats } from "../parser/tree.js";
 import type { ReadStats } from "../parser/types.js";
 
@@ -19,6 +19,7 @@ export interface CommandFlags {
   project: string | undefined;
   since: string | undefined;
   until: string | undefined;
+  source?: SessionSource;
   root?: string;
 }
 
@@ -76,13 +77,14 @@ export function inWindow(
 export async function loadSessions(
   flags: CommandFlags,
 ): Promise<LoadedSession[]> {
-  const files = await discoverSessionFiles(flags.root ?? defaultProjectsRoot());
+  const source = flags.source ?? (flags.root === undefined ? "auto" : "claude");
+  const files = await discoverFiles(source, flags.root === undefined ? undefined : { claude: flags.root });
   const wantedCwd =
     flags.project === undefined ? undefined : resolve(flags.project);
 
   const loaded: LoadedSession[] = [];
   for (const file of files) {
-    const parsed = await parseSessionFile(file.filePath);
+    const parsed = await parseDiscoveredSession(file);
     const summary = summarizeSession(file, parsed.session);
     if (wantedCwd !== undefined && summary.cwd !== wantedCwd) continue;
     loaded.push({
@@ -105,9 +107,9 @@ export async function loadSessions(
 export async function newestSessionPath(
   root: string,
 ): Promise<string | undefined> {
-  const files = await discoverSessionFiles(root);
+  const files = await discoverFiles("claude", { claude: root });
   for (const file of files) {
-    const parsed = await parseSessionFile(file.filePath);
+    const parsed = await parseDiscoveredSession(file);
     if (parsed.session.events.length > 0) return file.filePath;
   }
   return undefined;

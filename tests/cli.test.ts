@@ -5,7 +5,7 @@ describe("cli scaffold", () => {
   it("registers the v1 commands", () => {
     const program = buildProgram();
     const names = program.commands.map((command) => command.name());
-    expect(names).toEqual(["statusline", "context", "sessions", "doctor"]);
+    expect(names).toEqual(["statusline", "context", "live", "sessions", "doctor"]);
   });
 
   // Commands are grouped in --help by what they are for, and commander
@@ -21,6 +21,7 @@ describe("cli scaffold", () => {
     expect(groups.filter(([, group]) => group !== "")).toEqual([
       ["statusline", "Live:"],
       ["context", "Live:"],
+      ["live", "Live:"],
       ["sessions", "Reports:"],
       ["doctor", "Reports:"],
     ]);
@@ -44,8 +45,8 @@ describe("cli scaffold", () => {
     expect(help).toContain("Run with no command for the dashboard");
   });
 
-  it("is named ccvitals", () => {
-    expect(buildProgram().name()).toBe("ccvitals");
+  it("is named agenttracker", () => {
+    expect(buildProgram().name()).toBe("agenttracker");
   });
 });
 

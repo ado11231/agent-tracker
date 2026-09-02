@@ -12,6 +12,7 @@ interface Issue {
 }
 
 interface SessionIssues {
+  provider: string | undefined;
   sessionId: string | undefined;
   projectSlug: string;
   issues: Issue[];
@@ -105,6 +106,7 @@ export async function runDoctor(flags: CommandFlags): Promise<number> {
         else warnings += 1;
       }
       flagged.push({
+        provider: session.summary.provider,
         sessionId: session.summary.sessionId,
         projectSlug: session.summary.projectSlug,
         issues,
@@ -125,6 +127,7 @@ export async function runDoctor(flags: CommandFlags): Promise<number> {
           errors,
           flaggedSessions: flagged.map((session) => ({
             sessionId: session.sessionId,
+            provider: session.provider,
             projectSlug: session.projectSlug,
             issues: session.issues,
           })),
@@ -143,7 +146,7 @@ export async function runDoctor(flags: CommandFlags): Promise<number> {
   const dot = c.dim(glyphsFor(flags.ascii === true).dot);
   const lines: string[] = [];
   lines.push(
-    `${c.bold("ccvitals doctor")} ${dot} ${sessions.length} session${sessions.length === 1 ? "" : "s"} ` +
+    `${c.bold("agenttracker doctor")} ${dot} ${sessions.length} session${sessions.length === 1 ? "" : "s"} ` +
       `${dot} ${totalLines.toLocaleString()} line${totalLines === 1 ? "" : "s"} read`,
   );
   lines.push("");

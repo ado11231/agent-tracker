@@ -129,6 +129,7 @@ export async function runSessions(flags: SessionsFlags): Promise<number> {
         limited.map(({ session, rollup, snippet }) => {
           const summary = session.summary;
           return {
+            provider: summary.provider,
             sessionId: summary.sessionId,
             project: projectLabel(summary),
             cwd: summary.cwd ?? null,
