@@ -101,6 +101,13 @@ export async function runHook(
   // Codex reads one JSON object from a hook. systemMessage is the
   // field it shows to the user; anything else here would go to the
   // model instead, which is not what this panel is for.
-  console.log(JSON.stringify({ systemMessage: rows.join("\n") }));
+  //
+  // The leading newline matters. Codex prints the message after a
+  // label of its own ("Stop (completed) says: "), and without the
+  // break the first row continues that sentence, so the model and
+  // turn count read as part of Codex's plumbing rather than as the
+  // top row of the panel. Starting on a fresh line keeps the four
+  // rows aligned as the block they were designed to be.
+  console.log(JSON.stringify({ systemMessage: `\n${rows.join("\n")}` }));
   return 0;
 }
