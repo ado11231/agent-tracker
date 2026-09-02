@@ -7,3 +7,5 @@ dist/
 
 # Local Codex hook wiring, machine specific
 .codex/
+
+.DS_Store

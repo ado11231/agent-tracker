@@ -70,9 +70,13 @@ describe("runHook", () => {
     log.mockRestore();
 
     // Codex shows systemMessage and nothing else, so the panel has to
-    // arrive whole in that one field.
+    // arrive whole in that one field. It leads with a newline because
+    // Codex prints it after a label of its own, and without the break
+    // the first row continues that sentence instead of starting the
+    // panel.
     const rows = payload.systemMessage.split("\n");
-    expect(rows[0]).toContain("gpt-5-codex");
+    expect(rows[0]).toBe("");
+    expect(rows[1]).toContain("gpt-5-codex");
     // 600 fresh input, 400 cache reads and 100 cache writes against the
     // window Codex stated, not the Claude default of 200k.
     expect(payload.systemMessage).toContain("258k");
