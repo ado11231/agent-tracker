@@ -101,6 +101,28 @@ export interface SessionMeta {
   // The last compaction on the active branch, if the session was ever
   // compacted. Undefined is the common case by a wide margin.
   compaction: Compaction | undefined;
+  // Facts Codex writes into its own rollout log that Claude Code
+  // instead pipes to the statusline on stdin. Optional because the
+  // Claude parser has no source for them and never sets them.
+  //
+  // Codex states the real window per model, so reading it here beats
+  // the guess the statusline has to make from context size alone.
+  contextWindow?: number;
+  rateLimits?: ProviderRateLimits;
+}
+
+// A usage window the provider reports directly. The label is the
+// provider's own window, not ours: Claude reports a five hour and a
+// seven day window, Codex reports whatever window_minutes says, which
+// is a rolling month on current plans.
+export interface ProviderRateLimit {
+  usedPercentage: number;
+  label: string;
+}
+
+export interface ProviderRateLimits {
+  primary: ProviderRateLimit | undefined;
+  secondary: ProviderRateLimit | undefined;
 }
 
 export interface ExtractStats {

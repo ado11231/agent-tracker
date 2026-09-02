@@ -78,7 +78,15 @@ export async function loadSessions(
   flags: CommandFlags,
 ): Promise<LoadedSession[]> {
   const source = flags.source ?? (flags.root === undefined ? "auto" : "claude");
-  const files = await discoverFiles(source, flags.root === undefined ? undefined : { claude: flags.root });
+  // Tests and embedders can supply either provider's root. Previously a
+  // Codex source with a supplied root silently searched that path as if it
+  // were a Claude projects directory, making Codex live views untestable.
+  const roots = flags.root === undefined
+    ? undefined
+    : source === "codex"
+      ? { codex: flags.root }
+      : { claude: flags.root };
+  const files = await discoverFiles(source, roots);
   const wantedCwd =
     flags.project === undefined ? undefined : resolve(flags.project);
 

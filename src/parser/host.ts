@@ -11,6 +11,11 @@
 export interface RateLimit {
   // Percentage of the window consumed, 0 to 100 as the host sends it.
   usedPercentage: number;
+  // What to call this window on the panel. Claude Code's two windows
+  // are fixed, so it leaves this unset and the panel keeps its usual
+  // "5h" and "week". Codex reports a window length instead of a name,
+  // so its labels are derived and passed in.
+  label?: string;
 }
 
 export interface HostFacts {

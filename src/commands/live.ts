@@ -1,7 +1,6 @@
-import { cacheHitRatio } from "../cost/aggregate.js";
-import { fmtTokens, fmtUsd, shortModel } from "../render/format.js";
+import { glyphsFor } from "../render/glyphs.js";
+import { currentContext, statuslinePanel } from "../render/live.js";
 import { colorEnabled, makeStyle } from "../render/style.js";
-import { currentContext } from "../render/live.js";
 import { loadSessions, type CommandFlags } from "./load.js";
 
 export interface LiveFlags extends CommandFlags {
@@ -10,18 +9,17 @@ export interface LiveFlags extends CommandFlags {
 }
 
 function render(session: Awaited<ReturnType<typeof loadSessions>>[number], color: boolean): string {
-  const style = makeStyle(colorEnabled(color));
-  const summary = session.summary;
-  const context = currentContext(session.extracted);
-  const totalTokens = summary.total.tokens.input + summary.total.tokens.output + summary.total.tokens.cacheRead + summary.total.tokens.cacheWrite5m + summary.total.tokens.cacheWrite1h;
-  const model = context.model ?? summary.models.at(-1);
-  const cost = summary.total.unknownModels.length === 0 ? `~${fmtUsd(summary.total.usd)}` : "$?";
-  const cache = summary.total.messages === 0 ? undefined : cacheHitRatio(summary.total);
-  return [
-    `${style.bold("agenttracker live")}  ${summary.provider}  ${summary.turns} turns`,
-    `${model === undefined ? "unknown model" : shortModel(model)}  ${fmtTokens(totalTokens)} tokens  ${cost} API estimate`,
-    `context ${fmtTokens(context.tokens)}  cache ${cache === undefined ? "--" : `${Math.round(cache * 100)}%`}`,
-  ].join("\n");
+  const context = currentContext(session.extracted, session.summary.provider === "codex");
+  // Codex does not send a status-line payload like Claude Code does,
+  // but its session logs contain the same local usage data. Reuse the
+  // exact panel renderer so the companion view has the same hierarchy,
+  // gauges, colours, and graceful omissions as the Claude integration.
+  return statuslinePanel(session.summary, context, {
+    c: makeStyle(colorEnabled(color)),
+    g: glyphsFor(false),
+    contextWindow: 200_000,
+    width: process.stdout.isTTY ? process.stdout.columns : undefined,
+  }).join("\n");
 }
 
 export async function runLive(flags: LiveFlags): Promise<number> {
