@@ -109,6 +109,12 @@ export interface SessionMeta {
   // the guess the statusline has to make from context size alone.
   contextWindow?: number;
   rateLimits?: ProviderRateLimits;
+  // What is resident in the window right now, as the provider last
+  // reported it. Codex states this per turn, which is not something
+  // the per-turn deltas can be made to yield: summing them gives every
+  // token the session ever spent, a number that grows without bound
+  // and sails past the window on any long session.
+  contextTokens?: number;
 }
 
 // A usage window the provider reports directly. The label is the

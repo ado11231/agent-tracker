@@ -116,6 +116,15 @@ export async function parseCodexSessionFile(path: string): Promise<{ session: Ex
         if (typeof window === "number" && Number.isFinite(window) && window > 0) {
           meta.contextWindow = window;
         }
+        // The live window, straight from the provider. input_tokens
+        // already contains the cached half here, so the two are not
+        // added; cache writes are counted because they are resident
+        // too. Restated every snapshot, so the last one is current.
+        const last = record(info?.last_token_usage);
+        if (last !== undefined) {
+          const resident = number(last.input_tokens) + number(last.cache_write_input_tokens);
+          if (resident > 0) meta.contextTokens = resident;
+        }
         const limits = record(payload.rate_limits);
         if (limits !== undefined) {
           meta.rateLimits = {

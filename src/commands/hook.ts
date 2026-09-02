@@ -1,9 +1,7 @@
 import { basename, dirname } from "node:path";
 import { summarizeSession } from "../cost/aggregate.js";
 import { parseCodexSessionFile } from "../parser/codex.js";
-import { emptyHostFacts, type HostFacts } from "../parser/host.js";
-import type { ExtractedSession } from "../parser/events.js";
-import { currentContext, statuslinePanel } from "../render/live.js";
+import { panelInputs, statuslinePanel } from "../render/live.js";
 import { glyphsFor } from "../render/glyphs.js";
 import { colorEnabledWhenCaptured, makeStyle } from "../render/style.js";
 import type { CommandFlags } from "./load.js";
@@ -34,11 +32,6 @@ export interface HookInput {
   columns?: number | undefined;
 }
 
-// Codex's default window, used only when a session has not yet
-// reported one. Every token_count snapshot carries the real size, so
-// this is a first-turn fallback rather than a guess we live with.
-const FALLBACK_CONTEXT_WINDOW = 272_000;
-
 async function readStdin(): Promise<string | undefined> {
   if (process.stdin.isTTY) return undefined;
   const chunks: Buffer[] = [];
@@ -63,18 +56,6 @@ export function transcriptPathFrom(raw: string | undefined): string | undefined 
   if (typeof value !== "object" || value === null) return undefined;
   const path = (value as Record<string, unknown>).transcript_path;
   return typeof path === "string" && path !== "" ? path : undefined;
-}
-
-// Codex writes its context window and its rate limits into the log
-// itself, where Claude Code sends them on stdin. Rebuilding them as
-// HostFacts is what lets both providers share one renderer: the panel
-// never learns which agent it is drawing.
-export function hostFactsFrom(session: ExtractedSession): HostFacts {
-  const facts = emptyHostFacts();
-  facts.contextWindow = session.meta.contextWindow ?? FALLBACK_CONTEXT_WINDOW;
-  facts.fiveHour = session.meta.rateLimits?.primary;
-  facts.sevenDay = session.meta.rateLimits?.secondary;
-  return facts;
 }
 
 export async function runHook(
@@ -104,15 +85,14 @@ export async function runHook(
     { filePath, projectSlug: basename(dirname(filePath)) },
     parsed.session,
   );
-  // Codex persists cumulative counters, so the live window is the sum
-  // of the deltas the parser stored rather than the last one.
-  const context = currentContext(parsed.session, true);
-  const host = hostFactsFrom(parsed.session);
+  // The window, the rate limits and the cumulative token handling all
+  // come from the one place that knows how the two providers differ.
+  const { context, host, contextWindow } = panelInputs(parsed.session, "codex");
 
   const rows = statuslinePanel(summary, context, {
     c: makeStyle(colorEnabledWhenCaptured(flags.color)),
     g: glyphsFor(flags.ascii),
-    contextWindow: host.contextWindow ?? FALLBACK_CONTEXT_WINDOW,
+    contextWindow,
     host,
     width,
   });

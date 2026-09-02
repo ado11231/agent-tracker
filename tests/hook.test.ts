@@ -2,7 +2,8 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { runHook, transcriptPathFrom, hostFactsFrom } from "../src/commands/hook.js";
+import { runHook, transcriptPathFrom } from "../src/commands/hook.js";
+import { panelInputs } from "../src/render/live.js";
 import { parseCodexSessionFile } from "../src/parser/codex.js";
 
 // A Codex rollout with two cumulative token snapshots, a stated
@@ -42,10 +43,10 @@ describe("transcriptPathFrom", () => {
   });
 });
 
-describe("hostFactsFrom", () => {
+describe("panelInputs for codex", () => {
   it("carries the window and limits Codex logged", async () => {
     const parsed = await parseCodexSessionFile(await writeRollout());
-    const facts = hostFactsFrom(parsed.session);
+    const { host: facts } = panelInputs(parsed.session, "codex");
     expect(facts.contextWindow).toBe(258_400);
     // 43200 minutes is a rolling month, so the gauge says 30d rather
     // than the 5h the Claude panel hardcodes.
@@ -59,7 +60,7 @@ describe("runHook", () => {
     const path = await writeRollout();
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const code = await runHook(
-      { json: false, color: false, ascii: true },
+      { json: false, color: false, ascii: true, project: undefined, since: undefined, until: undefined },
       { stdin: JSON.stringify({ transcript_path: path, hook_event_name: "Stop" }), columns: 80 },
     );
     expect(code).toBe(0);
@@ -83,7 +84,7 @@ describe("runHook", () => {
   it("stays silent when the transcript cannot be read", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const code = await runHook(
-      { json: false, color: false, ascii: false },
+      { json: false, color: false, ascii: false, project: undefined, since: undefined, until: undefined },
       { stdin: JSON.stringify({ transcript_path: "/nope/missing.jsonl" }), columns: 80 },
     );
     expect(code).toBe(0);
@@ -94,7 +95,7 @@ describe("runHook", () => {
   it("stays silent when the payload names no transcript", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const code = await runHook(
-      { json: false, color: false, ascii: false },
+      { json: false, color: false, ascii: false, project: undefined, since: undefined, until: undefined },
       { stdin: "{}", columns: 80 },
     );
     expect(code).toBe(0);

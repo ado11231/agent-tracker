@@ -1,5 +1,5 @@
 import { glyphsFor } from "../render/glyphs.js";
-import { currentContext, statuslinePanel } from "../render/live.js";
+import { panelInputs, statuslinePanel } from "../render/live.js";
 import { colorEnabled, makeStyle } from "../render/style.js";
 import { loadSessions, type CommandFlags } from "./load.js";
 
@@ -8,16 +8,21 @@ export interface LiveFlags extends CommandFlags {
   refresh?: number;
 }
 
+// The same panel both agents show in their own chrome, watched from a
+// terminal of its own. Useful when you want it always visible rather
+// than reprinted per turn, and for an agent with no live surface at
+// all. It reads the session log, so it draws the same numbers the
+// statusline and the Codex hook do.
 function render(session: Awaited<ReturnType<typeof loadSessions>>[number], color: boolean): string {
-  const context = currentContext(session.extracted, session.summary.provider === "codex");
-  // Codex does not send a status-line payload like Claude Code does,
-  // but its session logs contain the same local usage data. Reuse the
-  // exact panel renderer so the companion view has the same hierarchy,
-  // gauges, colours, and graceful omissions as the Claude integration.
+  const { context, host, contextWindow } = panelInputs(
+    session.extracted,
+    session.summary.provider,
+  );
   return statuslinePanel(session.summary, context, {
     c: makeStyle(colorEnabled(color)),
     g: glyphsFor(false),
-    contextWindow: 200_000,
+    contextWindow,
+    host,
     width: process.stdout.isTTY ? process.stdout.columns : undefined,
   }).join("\n");
 }

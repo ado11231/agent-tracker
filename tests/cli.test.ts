@@ -5,7 +5,7 @@ describe("cli scaffold", () => {
   it("registers the v1 commands", () => {
     const program = buildProgram();
     const names = program.commands.map((command) => command.name());
-    expect(names).toEqual(["statusline", "hook", "context", "live", "sessions", "doctor"]);
+    expect(names).toEqual(["statusline", "hook", "context", "live", "sessions", "doctor", "setup"]);
   });
 
   // Commands are grouped in --help by what they are for, and commander
@@ -25,6 +25,7 @@ describe("cli scaffold", () => {
       ["live", "Live:"],
       ["sessions", "Reports:"],
       ["doctor", "Reports:"],
+      ["setup", "Setup:"],
     ]);
   });
 
