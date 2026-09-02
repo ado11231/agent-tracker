@@ -142,7 +142,7 @@ export function buildProgram(): Command {
     .option("--id <session>", "session id prefix")
     .option("--refresh <seconds>", "refresh interval; 0 prints once")
     .helpGroup(LIVE)
-    .description("Track the latest local Claude Code or Codex session (Codex: companion panel)")
+    .description("Watch the same panel in a terminal of its own")
     .action(async (_opts: RawOpts, command: Command) => {
       const opts = command.optsWithGlobals() as RawOpts;
       const refresh = opts.refresh === undefined ? undefined : Number(opts.refresh);
