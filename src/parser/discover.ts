@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 export interface SessionFile {
   filePath: string;
+  provider: SessionProvider;
   // File name without the .jsonl suffix.
   sessionId: string;
   // Directory name under the projects root. It encodes the project
@@ -14,15 +15,20 @@ export interface SessionFile {
   sizeBytes: number;
 }
 
-// Where Claude Code keeps its logs. CCVITALS_ROOT points somewhere else,
-// which exists for recording the README images against demo sessions
-// rather than against someone's real client work. It is not
-// configuration: there is nothing to set for normal use, and no file
-// anywhere remembers it.
+export type SessionProvider = "claude" | "codex";
+export type SessionSource = SessionProvider | "auto";
+
+// Claude Code session root. The legacy variable supports old demos.
 export function defaultProjectsRoot(): string {
-  const override = process.env.CCVITALS_ROOT;
+  const override = process.env.AGENTTRACKER_CLAUDE_ROOT ?? process.env.CCVITALS_ROOT;
   if (override !== undefined && override !== "") return override;
   return join(homedir(), ".claude", "projects");
+}
+
+export function defaultCodexRoot(): string {
+  const override = process.env.AGENTTRACKER_CODEX_ROOT;
+  if (override !== undefined && override !== "") return override;
+  return join(homedir(), ".codex", "sessions");
 }
 
 // Lists every session file under the projects root, newest first.
@@ -58,6 +64,7 @@ export async function discoverSessionFiles(
       }
       files.push({
         filePath,
+        provider: "claude",
         sessionId: entry.name.slice(0, -".jsonl".length),
         projectSlug: dir.name,
         modifiedAt: info.mtime,
@@ -68,4 +75,55 @@ export async function discoverSessionFiles(
 
   files.sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime());
   return files;
+}
+
+export async function discoverCodexSessionFiles(
+  root: string = defaultCodexRoot(),
+): Promise<SessionFile[]> {
+  const files: SessionFile[] = [];
+  async function walk(directory: string): Promise<void> {
+    let entries;
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const entryPath = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(entryPath);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+      let info;
+      try {
+        info = await stat(entryPath);
+      } catch {
+        continue;
+      }
+      const match = entry.name.match(/([0-9a-f]{8}-[0-9a-f-]{27,})\.jsonl$/i);
+      files.push({
+        filePath: entryPath,
+        provider: "codex",
+        sessionId: match?.[1] ?? entry.name.slice(0, -".jsonl".length),
+        projectSlug: "codex",
+        modifiedAt: info.mtime,
+        sizeBytes: info.size,
+      });
+    }
+  }
+  await walk(root);
+  files.sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime());
+  return files;
+}
+
+export async function discoverFiles(
+  source: SessionSource = "auto",
+  roots?: Partial<Record<SessionProvider, string>>,
+): Promise<SessionFile[]> {
+  const groups = await Promise.all([
+    source === "codex" ? [] : discoverSessionFiles(roots?.claude ?? defaultProjectsRoot()),
+    source === "claude" ? [] : discoverCodexSessionFiles(roots?.codex ?? defaultCodexRoot()),
+  ]);
+  return groups.flat().sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime());
 }

@@ -200,6 +200,7 @@ export function activityStats(
 }
 
 export interface SessionSummary {
+  provider?: "claude" | "codex";
   sessionId: string | undefined;
   projectSlug: string;
   filePath: string;
@@ -223,7 +224,7 @@ export interface SessionSummary {
 }
 
 export function summarizeSession(
-  file: { filePath: string; projectSlug: string },
+  file: { filePath: string; projectSlug: string; provider?: "claude" | "codex" },
   session: ExtractedSession,
 ): SessionSummary {
   const total = emptyRollup();
@@ -260,6 +261,7 @@ export function summarizeSession(
   }
 
   return {
+    provider: file.provider ?? "claude",
     sessionId: meta.sessionId,
     projectSlug: file.projectSlug,
     filePath: file.filePath,

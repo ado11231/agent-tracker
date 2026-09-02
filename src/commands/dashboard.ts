@@ -405,7 +405,7 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
   // a line that long is the widest thing on the screen and reads as a
   // divider between two halves of a report rather than as a heading for
   // the block below it. The blank line does that job.
-  lines.push(`  ${c.bold("ccvitals")}`);
+  lines.push(`  ${c.bold("agenttracker")}`);
   lines.push("");
   const cache = cacheHitRatio(total);
   lines.push(
@@ -564,7 +564,7 @@ function printDashboard(data: DashboardData, flags: DashboardFlags): void {
     lines.push("");
     lines.push(
       `  ${r.warn("no pricing")} for ${total.unknownModels.join(", ")}` +
-        `, see ccvitals doctor`,
+        `, see agenttracker doctor`,
     );
   }
 

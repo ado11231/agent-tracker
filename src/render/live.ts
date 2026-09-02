@@ -72,7 +72,7 @@ export interface PanelOptions {
   g: GlyphSet;
   // Total context window for the current model, from the session json
   // Claude Code pipes in. Only the size is taken from there; the token
-  // count stays ccvitals's own so it agrees with the dashboard.
+  // count stays local so it agrees with the dashboard.
   contextWindow: number;
   // Everything else the host told us about the live session. Defaults
   // to all absent, which is what a manual run from a shell gets.

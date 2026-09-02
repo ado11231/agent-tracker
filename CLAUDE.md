@@ -1,20 +1,20 @@
-# CLAUDE.md — ccvitals
+# CLAUDE.md — AgentTracker
 
 > Standing context for any Claude Code session working on this project.
 
 ## What this project is
 
-A **TypeScript npm CLI** for Claude Code observability. It reads the local
-session logs Claude Code already writes (`~/.claude/projects/<slug>/<session-id>.jsonl`)
+A **TypeScript npm CLI** for local agent observability. It reads Claude Code
+and Codex session logs (`~/.claude/projects` and `~/.codex/sessions`)
 and reports where tokens and dollars went — per session, day, project, and
 model — plus live surfaces for Claude Code's status line and context window.
 
-One-sentence identity: *a local, offline CLI that tells you where your Claude
-Code tokens went.*
+One-sentence identity: *a local, offline CLI that tells you where your agent
+tokens went.*
 
 ## Hard constraints (never violate)
 
-- **Read-only.** The tool only ever reads `~/.claude/projects/`. It never
+- **Read-only.** The tool only reads local provider session logs. It never
   writes outside its own install. "Uninstall leaves zero trace" is a promise.
 - **Offline.** No API calls, no network, no telemetry. Cost is derived from a
   local pricing table, not fetched.
@@ -33,8 +33,7 @@ Code tokens went.*
   and command surface went with it.
 - **Cut: LLM-powered bash explanation.** Unneeded — every Bash tool_use in the
   logs already carries a model-written `description` field.
-- **Cut: budgets/alerts** (needs a daemon) and **multi-tool support** (Codex
-  CLI etc. — dilutes identity; revisit later, if ever).
+- **Cut: budgets and alerts** because they need a daemon.
 - **TypeScript**, not Python — the Claude Code tooling ecosystem is
   npm-centric.
 

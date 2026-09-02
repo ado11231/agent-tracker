@@ -1,9 +1,11 @@
 {
-  "name": "ccvitals",
+  "name": "agenttracker",
   "version": "0.1.0",
-  "description": "Token metrics for Claude Code sessions",
+  "description": "Local token metrics for Claude Code and Codex sessions",
   "keywords": [
     "claude",
+    "codex",
+    "agent",
     "claude-code",
     "cli",
     "tokens",
@@ -15,16 +17,16 @@
   "type": "module",
   "license": "MIT",
   "author": "Adnan Alagic",
-  "homepage": "https://github.com/ado11231/ccvitals#readme",
+  "homepage": "https://github.com/ado11231/agenttracker#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ado11231/ccvitals.git"
+    "url": "git+https://github.com/ado11231/agenttracker.git"
   },
   "bugs": {
-    "url": "https://github.com/ado11231/ccvitals/issues"
+    "url": "https://github.com/ado11231/agenttracker/issues"
   },
   "bin": {
-    "ccvitals": "dist/main.js"
+    "agenttracker": "dist/main.js"
   },
   "files": [
     "dist"

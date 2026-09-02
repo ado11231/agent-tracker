@@ -9,6 +9,7 @@ import { runContext } from "./commands/context.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runSessions } from "./commands/sessions.js";
 import { runStatusline } from "./commands/statusline.js";
+import { runLive } from "./commands/live.js";
 import type { CommandFlags } from "./commands/load.js";
 
 // Help group headings. Live commands run beside a session in
@@ -29,6 +30,8 @@ interface RawOpts {
   grep?: string;
   span?: DashboardSpan;
   window?: string;
+  source?: "auto" | "claude" | "codex";
+  refresh?: string;
 }
 
 function toFlags(opts: RawOpts): CommandFlags {
@@ -39,6 +42,7 @@ function toFlags(opts: RawOpts): CommandFlags {
     project: opts.project,
     since: opts.since,
     until: opts.until,
+    source: opts.source,
   };
 }
 
@@ -59,6 +63,7 @@ function withCommonFlags(command: Command): Command {
 function withReportWindowFlags(command: Command): Command {
   return command
     .option("--project <path>", "only sessions from this project directory")
+    .option("--source <provider>", "claude, codex, or auto", "auto")
     .option("--since <date>", "window start, YYYY-MM-DD or an ISO timestamp")
     .option("--until <date>", "window end, inclusive");
 }
@@ -67,8 +72,8 @@ export function buildProgram(): Command {
   const program = new Command();
 
   program
-    .name("ccvitals")
-    .description("Token metrics for Claude Code sessions")
+    .name("agenttracker")
+    .description("Local token metrics for Claude Code and Codex sessions")
     .version(version);
 
   // Commands are grouped in --help by what they are for: the ones you
@@ -95,6 +100,7 @@ export function buildProgram(): Command {
     )
     .argument("[id]", "session id, unambiguous prefixes accepted")
     .option("--project <path>", "only sessions from this project directory")
+    .option("--source <provider>", "claude, codex, or auto", "auto")
     .option("--window <tokens>", "context window size, when the guess is wrong")
     .action(async (id: string | undefined, _opts: RawOpts, command: Command) => {
       const opts = command.optsWithGlobals() as RawOpts;
@@ -108,6 +114,21 @@ export function buildProgram(): Command {
         }
       }
       process.exitCode = await runContext({ ...toFlags(opts), id, window });
+    });
+
+  withCommonFlags(program.command("live"))
+    .option("--source <provider>", "claude, codex, or auto", "auto")
+    .option("--id <session>", "session id prefix")
+    .option("--refresh <seconds>", "refresh interval; 0 prints once")
+    .helpGroup(LIVE)
+    .description("Track the latest local Claude Code or Codex session")
+    .action(async (_opts: RawOpts, command: Command) => {
+      const opts = command.optsWithGlobals() as RawOpts;
+      const refresh = opts.refresh === undefined ? undefined : Number(opts.refresh);
+      if (refresh !== undefined && (!Number.isFinite(refresh) || refresh < 0)) {
+        console.error(`invalid --refresh: ${opts.refresh}`); process.exitCode = 1; return;
+      }
+      process.exitCode = await runLive({ ...toFlags(opts), refresh });
     });
 
   withReportWindowFlags(withCommonFlags(program.command("sessions")))
@@ -143,7 +164,7 @@ export function buildProgram(): Command {
       );
     });
 
-  // Running ccvitals with no command shows the dashboard. --span is how
+  // The bare command renders the dashboard.
   // far back to look, one rung at a time: week is today and this week,
   // month widens both rows, year adds the heatmap on top. It lives on
   // the root program because the bare dashboard is not a subcommand.

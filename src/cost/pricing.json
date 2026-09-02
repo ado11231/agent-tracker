@@ -1,4 +1,18 @@
 {
+  "gpt-5-codex": {
+    "input": 1.25,
+    "output": 10,
+    "cacheRead": 0.125,
+    "cacheWrite5m": 1.26,
+    "cacheWrite1h": 1.27
+  },
+  "codex-mini-latest": {
+    "input": 1.5,
+    "output": 6,
+    "cacheRead": 0.375,
+    "cacheWrite5m": 1.51,
+    "cacheWrite1h": 1.52
+  },
   "claude-fable-5": {
     "input": 10,
     "output": 50,

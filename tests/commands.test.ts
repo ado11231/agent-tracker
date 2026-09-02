@@ -172,7 +172,7 @@ describe("dashboard", () => {
     const code = await runDashboard(flags(await makeRoot(), { json: false }));
     expect(code).toBe(0);
     const text = logged();
-    expect(text).toContain("ccvitals");
+    expect(text).toContain("agenttracker");
     expect(text).toContain("today");
     expect(text).toContain("model");
     expect(text).not.toContain("[");
@@ -184,7 +184,7 @@ describe("dashboard", () => {
     const lines = logged().split("\n");
     // The name alone, a blank, then the labels over their values. No
     // rule under the name: the blank line is the separation.
-    expect(lines[0]).toBe("  ccvitals");
+    expect(lines[0]).toBe("  agenttracker");
     const labels = lines.findIndex((line) => line.includes("cache hit"));
     expect(labels).toBeGreaterThan(0);
     for (const label of ["all time", "sessions", "messages", "cache hit"]) {
@@ -437,7 +437,7 @@ describe("doctor", () => {
     logSpy.mockClear();
     expect(await runDoctor(flags(root, { json: false, ascii: true }))).toBe(0);
     expect(logged()).not.toContain("·");
-    expect(logged()).toContain("ccvitals doctor . ");
+    expect(logged()).toContain("agenttracker doctor . ");
   });
 
   it("does not flag stub sessions holding only metadata lines", async () => {

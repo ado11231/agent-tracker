@@ -122,7 +122,7 @@ export function assignModelPaints(
 export type Shades = [Paint, Paint, Paint, Paint];
 
 // A 24 bit paint. Written by hand because picocolors is a 16 color
-// library, and this is the one place in ccvitals that wants more: a heat
+// library, and this is the one place that wants more: a heat
 // ramp built from dim, normal, bright and bold spends its lowest step
 // on a washed out grey-ish tone, and the low step is the one most days
 // land on.

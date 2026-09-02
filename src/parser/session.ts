@@ -1,5 +1,7 @@
 import { extractSession, type ExtractedSession } from "./events.js";
 import { readSessionFile } from "./reader.js";
+import { parseCodexSessionFile } from "./codex.js";
+import type { SessionFile } from "./discover.js";
 import { resolveTree, type TreeStats } from "./tree.js";
 import type { ReadStats } from "./types.js";
 
@@ -20,4 +22,10 @@ export async function parseSessionFile(
     readStats: read.stats,
     treeStats: tree.stats,
   };
+}
+
+export async function parseDiscoveredSession(file: SessionFile): Promise<ParsedSessionFile> {
+  if (file.provider === "claude") return parseSessionFile(file.filePath);
+  const parsed = await parseCodexSessionFile(file.filePath);
+  return { ...parsed, treeStats: { leafSource: "last-prompt", missingParents: 0, inactiveLines: 0 } };
 }
