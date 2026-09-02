@@ -1,64 +1,56 @@
-# AgentTracker
+<h3 align="center">AgentTracker</h3>
 
-Local token, context, and API-cost estimates for Claude Code and Codex.
+<p align="center">
+  Local token, context, and cost tracking for Claude Code and Codex.
+</p>
 
-AgentTracker reads the session logs already on your machine. It makes no network
-requests, writes no configuration, and sends no telemetry.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ado11231/agent-tracker/main/docs/images/heatmap.png" alt="AgentTracker yearly activity heatmap">
+</p>
 
 ```bash
-npx agenttracker
 npm install -g agenttracker
+agenttracker
 ```
 
-Node 20 or newer is required.
+AgentTracker reads local session logs only. No network, telemetry, config, or
+state. Node 20 or newer is required.
+
+## Live tracking
+
+```bash
+agenttracker live --source codex
+```
+
+<p align="center">
+  <img width="760" src="https://raw.githubusercontent.com/ado11231/agent-tracker/main/docs/images/codex-live.png" alt="AgentTracker live Codex metrics showing model, turns, tokens, API estimate, context, and cache share">
+</p>
+
+The live view refreshes in place. Use `--id <prefix>` for one session or
+`--refresh 0` for a single snapshot. Codex costs are API-price estimates, not
+subscription charges.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `agenttracker` | Dashboard for sessions, projects, models, and tools |
-| `agenttracker sessions` | Recent sessions with cost, duration, and turns |
-| `agenttracker context [id]` | Context usage and contributors for one session |
-| `agenttracker live` | Refreshing view of the latest Claude Code or Codex session |
+| `agenttracker` | Dashboard by project, model, and tool |
+| `agenttracker live` | Live tokens, context, cache, and estimated cost |
+| `agenttracker sessions` | Recent sessions with cost and duration |
+| `agenttracker context [id]` | Context usage for one session |
+| `agenttracker doctor` | Parsing and pricing diagnostics |
 | `agenttracker statusline` | Claude Code status-line integration |
-| `agenttracker doctor` | Parse and pricing diagnostics |
 
-Use `--source claude`, `--source codex`, or `--source auto` with reports.
-`auto` is the default and includes both providers.
-
-## Live tracking
-
-`agenttracker live --source codex` watches the newest Codex rollout log and
-refreshes the model, turns, tokens, cache share, context, and API-cost estimate.
-Use `--id <prefix>` for a specific session or `--refresh 0` to print once.
-
-Codex sessions are read from `~/.codex/sessions`; Claude Code sessions are read
-from `~/.claude/projects`. AgentTracker only reads these locations.
-
-## Costs and context
-
-Token counts come from each provider's local logs. Claude Code costs use the
-local pricing table. Codex values are API-price estimates, not subscription
-charges, and are shown as estimates. Unknown models retain token counts and use
-`$?` until a local price is added.
-
-The detailed `context` report has the most complete attribution for Claude Code.
-Codex uses the context and token values recorded in its rollout log, with any
-breakdown clearly treated as an estimate.
+Use `--source claude`, `--source codex`, or `--source auto` on reports.
+`auto` includes both providers.
 
 ## Claude Code status line
-
-Add this to `~/.claude/settings.json`:
 
 ```json
 { "statusLine": { "type": "command", "command": "agenttracker statusline" } }
 ```
 
-## Flags
-
-Every command supports `--json` and `--no-color`. Reports also accept
-`--project`, `--since`, `--until`, and `--source`. `sessions` accepts
-`--limit`, `--model`, and `--grep`; `context` accepts `--window`.
+Add this to `~/.claude/settings.json`. For Codex, use `agenttracker live`.
 
 ## License
 
