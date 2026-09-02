@@ -6,7 +6,7 @@ import {
 } from "../cost/aggregate.js";
 import { parseHostJson } from "../parser/host.js";
 import { parseSessionFile } from "../parser/session.js";
-import { currentContext, statuslinePanel } from "../render/live.js";
+import { assumeContextWindow, currentContext, statuslinePanel } from "../render/live.js";
 import { glyphsFor } from "../render/glyphs.js";
 import { colorEnabledWhenCaptured, makeStyle } from "../render/style.js";
 import { defaultProjectsRoot } from "../parser/discover.js";
@@ -33,21 +33,6 @@ export interface StatuslineInput {
   // Columns to fit the panel into, or undefined for unknown. Injected
   // for the same reason as stdin.
   columns?: number | undefined;
-}
-
-// Claude Code's default window, and the extended tier. Both only
-// matter on a manual run: when Claude Code invokes us it always sends
-// the real size for the current model.
-const DEFAULT_CONTEXT_WINDOW = 200_000;
-const EXTENDED_CONTEXT_WINDOW = 1_000_000;
-
-// Picks a window when the session json did not name one. Context that
-// already exceeds the default proves the model is on the extended
-// tier, so assuming the small window there would report a false 100%.
-function assumeContextWindow(tokens: number): number {
-  return tokens > DEFAULT_CONTEXT_WINDOW
-    ? EXTENDED_CONTEXT_WINDOW
-    : DEFAULT_CONTEXT_WINDOW;
 }
 
 // Reads all of stdin, but only when something is actually piped in.

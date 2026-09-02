@@ -23,33 +23,75 @@ export interface CurrentContext {
   model: string | undefined;
 }
 
-export function currentContext(
-  session: ExtractedSession,
-  cumulativeSnapshots = false,
-): CurrentContext {
+export function currentContext(session: ExtractedSession): CurrentContext {
   let latest: (typeof session.usage)[number] | undefined;
   for (const entry of session.usage) {
     if (entry.isSidechain || !entry.onActiveBranch) continue;
     latest = entry;
   }
   if (latest === undefined) return { tokens: 0, model: undefined };
-  // Codex persists cumulative token snapshots. Its parser stores the
-  // deltas so costs aggregate correctly; adding those deltas back here
-  // recovers the current window rather than showing only the last turn.
-  if (cumulativeSnapshots) {
-    const tokens = session.usage
-      .filter((entry) => !entry.isSidechain && entry.onActiveBranch)
-      .reduce(
-        (sum, entry) =>
-          sum + entry.usage.input + entry.usage.cacheRead + entry.usage.cacheCreationTotal,
-        0,
-      );
-    return { tokens, model: latest.model };
+  // A provider that states the live window outright is believed over
+  // anything derived from per-turn usage. Only Codex does; Claude Code
+  // sends per-turn figures whose input side is the window by
+  // definition, since each call resends the whole conversation.
+  if (session.meta.contextTokens !== undefined) {
+    return { tokens: session.meta.contextTokens, model: latest.model };
   }
   const u = latest.usage;
   return {
     tokens: u.input + u.cacheRead + u.cacheCreationTotal,
     model: latest.model,
+  };
+}
+
+// Claude Code's default window, and the extended tier. Both only
+// matter when nobody told us the real size: Claude Code sends it on
+// stdin, and Codex writes it into its own log.
+export const DEFAULT_CONTEXT_WINDOW = 200_000;
+export const EXTENDED_CONTEXT_WINDOW = 1_000_000;
+
+// Picks a window when nothing named one. Context that already exceeds
+// the default proves the model is on the extended tier, so assuming
+// the small window there would report a false 100%.
+export function assumeContextWindow(tokens: number): number {
+  return tokens > DEFAULT_CONTEXT_WINDOW
+    ? EXTENDED_CONTEXT_WINDOW
+    : DEFAULT_CONTEXT_WINDOW;
+}
+
+// Everything the panel needs from a session, with the provider
+// differences resolved in one place.
+//
+// The two agents supply the same facts by different routes: Claude
+// Code pipes them to the statusline on stdin, Codex writes them into
+// its rollout log. Both the Codex hook and the `live` watch command
+// read from the log, so they resolve it here rather than each
+// reaching a different conclusion about the same session.
+export interface PanelInputs {
+  context: CurrentContext;
+  host: HostFacts;
+  contextWindow: number;
+}
+
+export function panelInputs(
+  session: ExtractedSession,
+  provider: string | undefined,
+  base?: HostFacts,
+): PanelInputs {
+  const codex = provider === "codex";
+  const context = currentContext(session);
+  const host = base ?? emptyHostFacts();
+  if (codex) {
+    // Codex states the real window per model and reports its own usage
+    // windows, so neither has to be guessed.
+    host.contextWindow ??= session.meta.contextWindow;
+    host.fiveHour ??= session.meta.rateLimits?.primary;
+    host.sevenDay ??= session.meta.rateLimits?.secondary;
+  }
+  return {
+    context,
+    host,
+    contextWindow: host.contextWindow ?? assumeContextWindow(context.tokens),
   };
 }
 

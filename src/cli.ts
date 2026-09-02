@@ -11,6 +11,7 @@ import { runSessions } from "./commands/sessions.js";
 import { runStatusline } from "./commands/statusline.js";
 import { runLive } from "./commands/live.js";
 import { runHook } from "./commands/hook.js";
+import { runSetup } from "./commands/setup.js";
 import type { CommandFlags } from "./commands/load.js";
 
 // Help group headings. Live commands run beside a session in
@@ -18,6 +19,16 @@ import type { CommandFlags } from "./commands/load.js";
 // colon is commander's convention for a heading.
 const LIVE = "Live:";
 const REPORTS = "Reports:";
+// Run once, when installing. Kept out of the two groups above so the
+// help stays a list of things you do with the tool, not to it.
+const SETUP = "Setup:";
+
+interface SetupOpts {
+  claude?: boolean;
+  codex?: boolean;
+  dryRun?: boolean;
+  uninstall?: boolean;
+}
 
 interface RawOpts {
   json?: boolean;
@@ -172,6 +183,23 @@ export function buildProgram(): Command {
       process.exitCode = await runDoctor(
         toFlags(command.optsWithGlobals() as RawOpts),
       );
+    });
+
+  program
+    .command("setup")
+    .helpGroup(SETUP)
+    .description("Wire the live panel into Claude Code, and into Codex")
+    .option("--claude", "only Claude Code's status line")
+    .option("--codex", "only Codex's hook, which Codex asks you to trust")
+    .option("--dry-run", "print what would change, write nothing")
+    .option("--uninstall", "remove what setup added")
+    .action(async (opts: SetupOpts) => {
+      process.exitCode = await runSetup({
+        claude: opts.claude === true,
+        codex: opts.codex === true,
+        dryRun: opts.dryRun === true,
+        uninstall: opts.uninstall === true,
+      });
     });
 
   // The bare command renders the dashboard.
