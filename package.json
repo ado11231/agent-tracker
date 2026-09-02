@@ -17,13 +17,13 @@
   "type": "module",
   "license": "MIT",
   "author": "Adnan Alagic",
-  "homepage": "https://github.com/ado11231/agenttracker#readme",
+  "homepage": "https://github.com/ado11231/agent-tracker#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ado11231/agenttracker.git"
+    "url": "git+https://github.com/ado11231/agent-tracker.git"
   },
   "bugs": {
-    "url": "https://github.com/ado11231/agenttracker/issues"
+    "url": "https://github.com/ado11231/agent-tracker/issues"
   },
   "bin": {
     "agenttracker": "dist/main.js"

@@ -38,7 +38,7 @@ Hide
 Type "clear" Enter
 Show
 
-Type "ccvitals --span year"
+Type "agenttracker --span year"
 Sleep 700ms
 Enter
 Sleep 4s

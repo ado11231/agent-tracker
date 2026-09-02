@@ -18,7 +18,7 @@ Hide
 Type "clear" Enter
 Show
 
-Type "ccvitals context"
+Type "agenttracker context"
 Sleep 800ms
 Enter
 Sleep 5s

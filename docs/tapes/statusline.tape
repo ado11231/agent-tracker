@@ -27,7 +27,7 @@ Hide
 Type "clear" Enter
 Show
 
-Type "ccvitals statusline"
+Type "agenttracker statusline"
 Sleep 700ms
 Enter
 Sleep 3s

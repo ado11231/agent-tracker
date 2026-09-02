@@ -9,7 +9,11 @@ Hide
 Type "clear" Enter
 Show
 
-Type "node dist/main.js live --source codex --refresh 0 --no-color"
+# The same rows Codex prints after a turn, from the same renderer.
+# Colors are left on here: the gauges are the one place color carries
+# meaning rather than decoration, so a plain capture would misreport
+# what the panel looks like in use.
+Type "agenttracker live --source codex --refresh 0"
 Sleep 300ms
 Enter
 Sleep 3s
